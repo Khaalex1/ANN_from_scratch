@@ -94,18 +94,18 @@ class MLP:
         :param corr: ??
         :return:
         """
-        X_train, y_train = X, y
-        # Check the dimension of the label vector
-        if len(y_train.shape) < 2:
-            y_train = y_train[:, None]
 
-        """# Split the dataset into training and validation dataset
+        # Check the dimension of the label vector
+        if len(y.shape) < 2:
+            y = y[:, None]
+
+        # Split the dataset into training and validation dataset
         data_shuffle = np.hstack((X, y))
-        np.random.shuffle(data)
+        np.random.shuffle(data_shuffle)
         n_val = int(val_split * X.shape[0])
         X_val, y_val = data_shuffle[0:n_val, 0:-1], data_shuffle[0:n_val, -1]
         X_train, y_train = data_shuffle[n_val:-1, 0:-1], data_shuffle[n_val:-1, -1][:, None]
-        """
+
         # Check the input
         # verify samples (0) > features (1)
         if X_train.shape[0] < X_train.shape[1]:
@@ -152,7 +152,7 @@ class MLP:
             # Gradient descent
             step_acc, step_err = self.gradient_descent(gamma=l, reg_L2=reg_L2, batch_size=BATCH_SIZE)
             # Evaluate the MLP on the validation data
-            """y_proba_val = self.predict_proba(X_val)
+            y_proba_val = self.predict_proba(X_val)
             y_pred_val = self.predict(X_val)
             val_acc = accuracy(y_pred_val, y_val)
             if isinstance(self.func_activation[self.counter], ActivationFunction.Softmax):
@@ -162,12 +162,12 @@ class MLP:
                 val_err = self.error.value(y_val, y_proba_val)
             self.history['val_acc'].append(val_acc)
             self.history['val_loss'].append(val_err)
-            """
+
             # Print the training metrics
             if ep == 1 or ep % 10 == 0:
                 print("Epoch : {},  acc : {} - loss : {} - val accuracy : {} - val loss : {}".format(ep, step_acc,
-                                                                                                     step_err, "val_acc",
-                                                                                                     "val_err"))
+                                                                                                     step_err, val_acc,
+                                                                                                     val_err))
         tf = datetime.datetime.now() - t0
         print('Training time (hh:mm:ss): {}'.format(tf))
         print('---' * 10)
