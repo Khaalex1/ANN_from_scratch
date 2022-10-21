@@ -371,7 +371,7 @@ class MLP:
                 simple_acc += accuracy((a >= 0.5).astype('int'), y)
                 simple_err += self.error.value(y, a)
             elif isinstance(self.func_activation[self.counter], ActivationFunction.Tanh):
-                simple_acc += accuracy((a >= 0).astype('int'), y)
+                simple_acc += accuracy((a >= 0.5).astype('int'), y)
                 simple_err += self.error.value(y, a)
             else:
                 # softmax
@@ -404,7 +404,7 @@ class MLP:
         if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
             return (y_proba >= 0.5).astype('int')
         elif isinstance(self.func_activation[self.counter], ActivationFunction.Tanh):
-            return (y_proba >= 0).astype('int')
+            return (y_proba >= 0.5).astype('int')
         else:
             # softmax
             return np.argmax(y_proba, 0)
@@ -448,7 +448,7 @@ if __name__ == "__main__":
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=32, activation='relu')
     AN.BatchNormalization()
-    AN.add_layer(nb_nodes=1, activation='sigmoid')
+    AN.add_layer(nb_nodes=1, activation='tanh')
     AN.fit(X_train, Y_train, loss="binary_cross_entropy", BATCH_SIZE=32, EPOCHS=350, l=0.001)
     AN.training_curve()
 
