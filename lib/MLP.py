@@ -75,7 +75,7 @@ class MLP:
         self.history['val_loss'] = []
         self.epochs = None
 
-    def fit(self, X, y, loss, BATCH_SIZE=1, EPOCHS=300, val_split = 0.3, l=0.001, reg_L2=0, corr=0.9999, acc_limit=0.99):
+    def fit(self, X, y, loss, BATCH_SIZE=1, EPOCHS=300, val_split=0.3, l=0.001, reg_L2=0, corr=0.9999, acc_limit=0.99):
         """
         Training of the MLP (fitting the weights with gradient descent)
         :param X: training data matrix(n_samples,n_features)
@@ -89,21 +89,20 @@ class MLP:
         :param corr: ??
         :return:
         """
+        X_train, y_train = X, y
         # Check the dimension of the label vector
-        if len(y.shape) < 2:
-            y = y[:, None]
+        if len(y_train.shape) < 2:
+            y_train = y_train[:, None]
 
-        #Split the dataset into training and validation dataset
+        """# Split the dataset into training and validation dataset
         data_shuffle = np.hstack((X, y))
         np.random.shuffle(data)
         n_val = int(val_split * X.shape[0])
         X_val, y_val = data_shuffle[0:n_val, 0:-1], data_shuffle[0:n_val, -1]
         X_train, y_train = data_shuffle[n_val:-1, 0:-1], data_shuffle[n_val:-1, -1][:, None]
-        #Check the inputs
-        if self.X_train is not None:  # Why do we need to reinitialize the weights ? Can't we continue the training after one training ?
-            self.reinitialize()
+        # Check the input"""
         # verify samples (0) > features (1)
-        if X.shape[0] < X.shape[1]:
+        if X_train.shape[0] < X_train.shape[1]:
             self.X_train = X_train.T
         else:
             self.X_train = X_train
@@ -112,7 +111,6 @@ class MLP:
         self.nb_samp = y_train.size
         self.nb_feat = X_train.shape[1]
         self.nb_class = int(y_train.max() + 1)
-
 
         self.accuracy = []
         self.loss = []
@@ -139,41 +137,39 @@ class MLP:
         ep = 0
         print("batch size = ", BATCH_SIZE)
         print("loss function : ", loss)
-        print('---'*10)
+        print('---' * 10)
         print('Training...')
         t0 = datetime.datetime.now()
-        while ep < EPOCHS and step_acc<acc_limit:
-            #Epoch ep
-            ep +=1
-            #Gradient descent
-            step_acc, step_err = self.gradient_descent(ep, gamma=l, reg_L2=reg_L2, corr=corr, batch_size=BATCH_SIZE)
-            #Evaluate the MLP on the validation data
-            #TODO : create anonther function or put this part in the accuracy function
+        while ep < EPOCHS and step_acc < acc_limit:
+            # Epoch ep
+            ep += 1
+            # Gradient descent
+            step_acc, step_err = self.gradient_descent(gamma=l, reg_L2=reg_L2, batch_size=BATCH_SIZE)
+            # Evaluate the MLP on the validation data
+            """y_proba_val = self.predict_proba(X_val)
             y_pred_val = self.predict(X_val)
-            if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
-                val_acc = accuracy((y_pred_val >= 0.5).astype('int'), y_val)
-                val_err = self.error.value(y_val, y_pred_val)
-            elif isinstance(self.func_activation[self.counter], ActivationFunction.Tanh):
-                val_acc = accuracy((y_pred_val >= 0).astype('int'), y_val)
-                val_err = self.error.value(y_val, y_pred_val)
-            else:
-                # softmax
+            val_acc = accuracy(y_pred_val, y_val)
+            if isinstance(self.func_activation[self.counter], ActivationFunction.Softmax):
                 self.error.one_hot = True
-                val_acc = accuracy(np.argmax(y_pred_val, 0), y_val)
-                val_err = self.error.value(one_hot(y_val), y_pred_val)
+                val_err = self.error.value(one_hot(y_val), y_proba_val)
+            else :
+                val_err = self.error.value(y_val, y_proba_val)
             self.history['val_acc'].append(val_acc)
             self.history['val_loss'].append(val_err)
-            #Print the training metrics
+            """
+            # Print the training metrics
             if ep == 1 or ep % 10 == 0:
-                print("Epoch : {},  acc : {} - loss : {} - val accuracy : {} - val loss : {}".format(ep, step_acc, step_err, val_acc, val_err))
+                print("Epoch : {},  acc : {} - loss : {} - val accuracy : {} - val loss : {}".format(ep, step_acc,
+                                                                                                     step_err, "val_acc",
+                                                                                                     "val_err"))
         tf = datetime.datetime.now() - t0
         print('Training time (hh:mm:ss): {}'.format(tf))
-        print('---'*10)
+        print('---' * 10)
         self.epochs = np.linspace(1, EPOCHS, len(self.history['acc']))
         print('Last epoch :')
         print("Epoch : {},  Batch accuracy : {} - Batch error = {}".format(ep, step_acc, step_err))
-
-
+        y_pred = self.predict(X)
+        print(accuracy(y_pred, y.flatten()))
 
     def reinitialize(self):
         """
@@ -190,15 +186,15 @@ class MLP:
         """
         figure, ax = plt.subplots(1, 2, figsize=(10, 5))
         ax[0].set_title('Accuracy in function of epoch')
-        ax[0].plot(self.epochs, self.history['acc'], color='blue', label='train data')
-        ax[0].plot(self.epochs, self.history['val_acc'], color='orange', label='val data')
+        ax[0].plot(self.history['acc'], color='blue', label='train data')
+        ax[0].plot(self.history['val_acc'], color='orange', label='val data')
         ax[0].grid()
         ax[0].legend()
         ax[0].set_xlabel('epochs')
         ax[0].set_ylabel('accuracy')
         ax[1].grid()
-        ax[1].plot(self.epochs, self.history['loss'], color='blue', label='train data')
-        ax[1].plot(self.epochs, self.history['val_loss'], color='orange', label='val data')
+        ax[1].plot(self.history['loss'], color='blue', label='train data')
+        ax[1].plot(self.history['val_loss'], color='orange', label='val data')
         ax[1].set_xlabel('epochs')
         ax[1].set_ylabel('error')
         ax[1].set_title('Error (/loss) in function of epoch')
@@ -341,8 +337,8 @@ class MLP:
         return self.Weights, self.Bias
 
 
-    def gradient_descent(self, ep, gamma=0.1,
-                         reg_L2=0, corr=0.9999, batch_size=1):
+    def gradient_descent(self, gamma=0.1,
+                         reg_L2=0, batch_size=1):
         """
         General gradient descent algorithm
         :param gamma: learning rate
@@ -368,7 +364,7 @@ class MLP:
             Z, out = self.forward_propagation(X_batch.T)
             # Backpropagation
             dW, dB = self.back_propagation(Z, out, Y_batch)
-            self.update_parameters(dW, dB, gamma * corr ** ep, reg_L2=reg_L2, batch_size=batch_size)
+            self.update_parameters(dW, dB, gamma, reg_L2=reg_L2, batch_size=batch_size)
             y = Y_batch
             a = out[self.counter]
             if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
@@ -389,7 +385,7 @@ class MLP:
         return step_acc, step_err
 
 
-    def predict(self, X):
+    def predict_proba(self, X):
         """
         Prediction of the MLP Neural Network
         :param X: input of the MLP
@@ -403,60 +399,78 @@ class MLP:
         Z, out = self.forward_propagation(X)
         return out[self.counter]
 
+    def predict(self, X):
+        y_proba = self.predict_proba(X)
+        if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
+            return (y_proba >= 0.5).astype('int')
+        elif isinstance(self.func_activation[self.counter], ActivationFunction.Tanh):
+            return (y_proba >= 0).astype('int')
+        else:
+            # softmax
+            return np.argmax(y_proba, 0)
 
-#  ------------------------------------------------------
-# TEST
-# --------------------------------------------------------
-data = pd.read_csv('../wdbc.csv')
-data.columns = [i for i in range(32)]
+if __name__ == "__main__":
+    #  ------------------------------------------------------
+    # TEST
+    # --------------------------------------------------------
+    data = pd.read_csv('../wdbc.csv')
+    data.columns = [i for i in range(32)]
 
-d = {'B': 0, 'M': 1}
-label_col = data[1].replace(d)
+    d = {'B': 0, 'M': 1}
+    label_col = data[1].replace(d)
 
-data.pop(1)
-data['label'] = label_col
+    data.pop(1)
+    data['label'] = label_col
 
-print(data.shape)
-print(data.head())
+    print(data.shape)
+    print(data.head())
 
-print(np.where(data.isna() == True))
+    print(np.where(data.isna() == True))
 
-data = data.sample(frac=1)
-data = data.to_numpy()
+    data = data.sample(frac=1)
+    data = data.to_numpy()
 
-nb_samp, nb_feat = data.shape
-nb_feat -= 1
-nb_train = int(0.8 * nb_samp)
+    nb_samp, nb_feat = data.shape
+    nb_feat -= 1
+    nb_train = int(0.8 * nb_samp)
 
-X_train = data[:nb_train, :nb_feat]
-# instance normalization
-X_train /= X_train.max(axis=0)
+    X_train = data[:nb_train, :nb_feat]
+    # pseudo min-max normalization
+    X_train /= X_train.max(axis=0)
+    Y_train = data[:nb_train, nb_feat].astype('int')
 
-Y_train = data[:nb_train, nb_feat].astype('int')
+    X_test = data[nb_train:, :nb_feat]
+    X_test /= X_test.max(axis=0)
+    Y_test = data[nb_train:, nb_feat].astype('int')
 
-X_test = data[nb_train:, :nb_feat]
-X_test /= X_test.max(axis=0)
-Y_test = data[nb_train:, nb_feat].astype('int')
+    AN = MLP()
+    AN.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=32, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=1, activation='sigmoid')
+    AN.fit(X_train, Y_train, loss="binary_cross_entropy", BATCH_SIZE=32, EPOCHS=350, l=0.001)
+    AN.training_curve()
 
-AN = MLP()
-AN.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
-AN.BatchNormalization()
-AN.add_layer(nb_nodes=32, activation='relu')
-#AN.BatchNormalization()
-# AN.add_layer(nb_nodes=100, activation='relu')
-# AN.BatchNormalization()
-# AN.add_layer(nb_nodes=100, activation='relu')
-# AN.BatchNormalization()
-# AN.add_layer(nb_nodes=100, activation='relu')
-# AN.BatchNormalization()
-# AN.add_layer(nb_nodes=50, activation='relu')
-AN.BatchNormalization()
-AN.add_layer(nb_nodes=2, activation='softmax')
-AN.fit(X_train, Y_train, loss="cross_entropy", BATCH_SIZE=32, EPOCHS=350, l=0.001)
-#AN.gradient_descent(gamma=1e-3, epochs=400, loss="cross_entropy", batch_size=16)
-AN.training_curve()
+    """AN = MLP()
+    AN.add_layer(nb_nodes=100, feat_size=nb_feat, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=100, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=100, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=100, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=100, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=50, activation='relu')
+    AN.BatchNormalization()
+    AN.add_layer(nb_nodes=2, activation='softmax')
+    AN.fit(X_train, Y_train, loss="cross_entropy", BATCH_SIZE=32, EPOCHS=350, l=0.001)
+    AN.training_curve()
+    """
 
-y_pred = np.argmax(AN.predict(X_test), 0)
-print('---'*10)
-print("Accuracy on Test set :", accuracy(y_pred, Y_test))
-# use the same conditions to compute the accuracy for the test as for the training and val data (check the instance and encode in one hot if needed)
+    y_pred = AN.predict(X_test)
+    print('---'*10)
+    print("Accuracy on Test set :", accuracy(y_pred, Y_test))
+    # use the same conditions to compute the accuracy for the test as for the training and val data (check the instance and encode in one hot if needed)
