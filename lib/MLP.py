@@ -39,7 +39,11 @@ def batchNorm(Z):
     :return: the normalized vector
     """
     m, std = np.mean(Z), np.std(Z)
-    return (Z - m) / std
+    if std ==0:
+        print("Warning ! BatchNorm failed because samples' std is 0")
+        return Z
+    else:
+        return (Z - m) / std
 
 
 def dot_col(y, A):
@@ -75,7 +79,8 @@ class MLP:
         self.history['val_loss'] = []
         self.epochs = None
 
-    def fit(self, X, y, loss, BATCH_SIZE=1, EPOCHS=300, val_split=0.3, l=0.001, reg_L2=0, corr=0.9999, acc_limit=0.99):
+
+    def fit(self, X, y, loss, BATCH_SIZE=32, EPOCHS=300, val_split=0.3, l=0.001, reg_L2=0, acc_limit=0.99):
         """
         Training of the MLP (fitting the weights with gradient descent)
         :param X: training data matrix(n_samples,n_features)
