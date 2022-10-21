@@ -40,7 +40,6 @@ def batchNorm(Z):
     """
     m, std = np.mean(Z), np.std(Z)
     if std ==0:
-        print("Warning ! BatchNorm failed because samples' std is 0")
         return Z
     else:
         return (Z - m) / std
@@ -79,8 +78,40 @@ class MLP:
         self.history['val_loss'] = []
         self.epochs = None
 
+        self.loss = None
+        self.optimizer = None
 
-    def fit(self, X, y, loss, BATCH_SIZE=32, EPOCHS=300, val_split=0.3, l=0.001, reg_L2=0, acc_limit=0.99):
+        self.Eb = {}
+        self.Ew = {}
+
+    def compile(self, optimizer="sgd", loss = 'cross_entropy'):
+        if optimizer not in ["sgd", "batch", "minibatch", "rmsprop"]:
+            print("Warning ! Specified optimizer is not recognized.")
+            print("List of recognized optimizers : 'sgd', 'batch', 'minibatch', 'rmsprop'.")
+            print("Optimizer 'minibatch' is taken by default.")
+            optimizer = 'minibatch'
+        self.optimizer = optimizer
+
+        # Check the loss
+        if loss not in ["mse", "abs", "cross_entropy", "binary_cross_entropy"]:
+            print("Warning ! Specified loss function is not recognized.")
+            print("List of recognized functions : 'cross_entropy', 'abs', mse'.")
+            print("Loss function 'cross_entropy' is taken by default.")
+            loss = "cross_entropy"
+        self.loss = loss
+        # Set the loss
+        if loss == "mse":
+            self.error = Loss.MSE()
+        elif loss == "abs":
+            self.error = Loss.Abs()
+        elif loss == "binary_cross_entropy":
+            self.error = Loss.CrossEntropy(one_hot=False, binary=True)
+        else:
+            self.error = Loss.CrossEntropy(one_hot=False, binary=False)
+
+
+
+    def fit(self, X, y, BATCH_SIZE=32, EPOCHS=300, val_split=0.3, l=0.001):
         """
         Training of the MLP (fitting the weights with gradient descent)
         :param X: training data matrix(n_samples,n_features)
@@ -121,36 +152,31 @@ class MLP:
         self.accuracy = []
         self.loss = []
         # Check the BATCH_SIZE
-        if BATCH_SIZE == 0 or BATCH_SIZE > self.y_train.shape[0]:
+        if self.optimizer == "batch":
             BATCH_SIZE = self.y_train.shape[0]
-        # Check the loss
-        if loss not in ["mse", "abs", "cross_entropy", "binary_cross_entropy"]:
-            print("Warning ! Specified loss function is not recognized.")
-            print("List of recognized functions : 'cross_entropy', 'abs', mse'.")
-            print("Loss function 'cross_entropy' is taken by default.")
-            loss = "cross_entropy"
-        # Set the loss
-        if loss == "mse":
-            self.error = Loss.MSE()
-        elif loss == "abs":
-            self.error = Loss.Abs()
-        elif loss == "binary_cross_entropy":
-            self.error = Loss.CrossEntropy(one_hot=False, binary=True)
-        else:
-            self.error = Loss.CrossEntropy(one_hot=False, binary=False)
+        elif self.optimizer == "sgd":
+            BATCH_SIZE = 1
+        else :
+            # minibatch / rmsprop
+            if self.optimizer == "rmsprop":
+                self.Eb = {key:0 for key in self.Bias.keys()}
+                self.Ew = {key:0 for key in self.Weights.keys()}
+            if BATCH_SIZE <= 0 or BATCH_SIZE > self.y_train.shape[0]:
+                # batch descent case
+                BATCH_SIZE = self.y_train.shape[0]
         step_acc = 0
         step_err = 0
         ep = 0
         print("batch size = ", BATCH_SIZE)
-        print("loss function : ", loss)
+        print("loss function : ", self.loss)
         print('---' * 10)
         print('Training...')
         t0 = datetime.datetime.now()
-        while ep < EPOCHS and step_acc < acc_limit:
+        while ep < EPOCHS :
             # Epoch ep
             ep += 1
             # Gradient descent
-            step_acc, step_err = self.gradient_descent(gamma=l, reg_L2=reg_L2, batch_size=BATCH_SIZE)
+            step_acc, step_err = self.gradient_descent(gamma=l, batch_size=BATCH_SIZE)
             # Evaluate the MLP on the validation data
             y_proba_val = self.predict_proba(X_val)
             y_pred_val = self.predict(X_val)
@@ -174,8 +200,7 @@ class MLP:
         self.epochs = np.linspace(1, EPOCHS, len(self.history['acc']))
         print('Last epoch :')
         print("Epoch : {},  Batch accuracy : {} - Batch error = {}".format(ep, step_acc, step_err))
-        y_pred = self.predict(X)
-        print(accuracy(y_pred, y.flatten()))
+
 
     def reinitialize(self):
         """
@@ -327,7 +352,7 @@ class MLP:
 
         return dW, dB
 
-    def update_parameters(self, dW, dB, gamma, batch_size=1, reg_L2=0):
+    def update_parameters(self, dW, dB, gamma, batch_size=32):
         """
         Update the parameters of the MLP
         :param dW: partial derivative of the cost in relation of the weights W
@@ -337,14 +362,21 @@ class MLP:
         :param reg_L2:
         :return:
         """
-        for key in self.Weights:
-            self.Weights[key] += - gamma * dW[key] + (reg_L2 / batch_size) * self.Weights[key]
-            self.Bias[key] -= gamma * dB[key]
+        if self.optimizer == "rmsprop":
+            for key in self.Weights:
+                self.Ew[key] = 0.9 * self.Ew[key] + 0.1 * dW[key] ** 2
+                self.Weights[key] -= gamma * 1/np.sqrt(self.Ew[key] + 1e-8) * dW[key]
+                self.Eb[key] = 0.9 * self.Eb[key] + 0.1 * dB[key] ** 2
+                self.Bias[key] -= gamma * 1/np.sqrt(self.Eb[key] + 1e-8) * dB[key]
+        else :
+            for key in self.Weights:
+                self.Weights[key] -=  gamma * dW[key]
+                self.Bias[key] -= gamma * dB[key]
         return self.Weights, self.Bias
 
 
     def gradient_descent(self, gamma=0.1,
-                         reg_L2=0, batch_size=1):
+                          batch_size=1):
         """
         General gradient descent algorithm
         :param gamma: learning rate
@@ -370,7 +402,7 @@ class MLP:
             Z, out = self.forward_propagation(X_batch.T)
             # Backpropagation
             dW, dB = self.back_propagation(Z, out, Y_batch)
-            self.update_parameters(dW, dB, gamma, reg_L2=reg_L2, batch_size=batch_size)
+            self.update_parameters(dW, dB, gamma, batch_size=batch_size)
             y = Y_batch
             a = out[self.counter]
             if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
@@ -449,16 +481,17 @@ if __name__ == "__main__":
     X_test /= X_test.max(axis=0)
     Y_test = data[nb_train:, nb_feat].astype('int')
 
-    AN = MLP()
+    """AN = MLP()
     AN.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=32, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=1, activation='tanh')
-    AN.fit(X_train, Y_train, loss="binary_cross_entropy", BATCH_SIZE=32, EPOCHS=150, l=0.001)
-    AN.training_curve()
+    AN.compile(optimizer="rmsprop", loss = "binary_cross_entropy")
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=300, l=0.001)
+    AN.training_curve()"""
 
-    """AN = MLP()
+    AN = MLP()
     AN.add_layer(nb_nodes=100, feat_size=nb_feat, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=100, activation='relu')
@@ -472,9 +505,10 @@ if __name__ == "__main__":
     AN.add_layer(nb_nodes=50, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=2, activation='softmax')
-    AN.fit(X_train, Y_train, loss="cross_entropy", BATCH_SIZE=32, EPOCHS=350, l=0.001)
+    AN.compile(optimizer="rmsprop", loss="cross_entropy")
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=300, l=0.001)
     AN.training_curve()
-    """
+
 
     y_pred = AN.predict(X_test)
     print('---'*10)
