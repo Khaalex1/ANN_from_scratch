@@ -100,7 +100,8 @@ class MLP:
         n_val = int(val_split * X.shape[0])
         X_val, y_val = data_shuffle[0:n_val, 0:-1], data_shuffle[0:n_val, -1]
         X_train, y_train = data_shuffle[n_val:-1, 0:-1], data_shuffle[n_val:-1, -1][:, None]
-        # Check the input"""
+        """
+        # Check the input
         # verify samples (0) > features (1)
         if X_train.shape[0] < X_train.shape[1]:
             self.X_train = X_train.T
@@ -449,7 +450,7 @@ if __name__ == "__main__":
     AN.add_layer(nb_nodes=32, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=1, activation='tanh')
-    AN.fit(X_train, Y_train, loss="binary_cross_entropy", BATCH_SIZE=32, EPOCHS=350, l=0.001)
+    AN.fit(X_train, Y_train, loss="binary_cross_entropy", BATCH_SIZE=32, EPOCHS=150, l=0.001)
     AN.training_curve()
 
     """AN = MLP()
