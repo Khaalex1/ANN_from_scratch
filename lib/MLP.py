@@ -4,6 +4,7 @@ import datetime
 import matplotlib.pyplot as plt
 import ActivationFunction, Loss
 from MinMax import MinMax
+import Optimizer
 
 
 def accuracy(predicted, ground_truth):
@@ -105,12 +106,8 @@ class MLP:
 
         self.loss = None
         self.optimizer = None
+        self.opt_class = None
         self.batch_size = 0
-
-        self.Sb = {}
-        self.Sw = {}
-        self.Vb = {}
-        self.Vw = {}
 
     def compile(self, optimizer="minibatch", loss = 'cross_entropy'):
         if optimizer not in ["sgd", "batch", "minibatch", "rmsprop", "adam"]:
@@ -119,6 +116,16 @@ class MLP:
             print("Optimizer 'minibatch' is taken by default.")
             optimizer = 'minibatch'
         self.optimizer = optimizer
+        if optimizer == "sgd":
+            self.opt_class = Optimizer.SGD(self)
+        elif optimizer == "batch":
+            self.opt_class = Optimizer.Batch(self)
+        elif optimizer == "minibatch":
+            self.opt_class = Optimizer.Minibatch(self)
+        elif optimizer == "rmsprop":
+            self.opt_class = Optimizer.RMSPROP(self)
+        else:
+            self.opt_class = Optimizer.ADAM(self)
 
         # Check the loss
         if loss not in ["mse", "abs", "cross_entropy", "binary_cross_entropy"]:
@@ -176,21 +183,8 @@ class MLP:
         self.nb_class = int(y_train.max() + 1)
 
         # Check the BATCH_SIZE
-        if self.optimizer == "batch":
-            BATCH_SIZE = self.y_train.shape[0]
-        elif self.optimizer == "sgd":
-            BATCH_SIZE = 1
-        else :
-            # minibatch / rmsprop
-            if self.optimizer == "rmsprop" or self.optimizer =="adam":
-                self.Sb = {key:0 for key in self.Bias.keys()}
-                self.Sw = {key:0 for key in self.Weights.keys()}
-                self.Vb = {key: 0 for key in self.Bias.keys()}
-                self.Vw = {key: 0 for key in self.Weights.keys()}
-            if BATCH_SIZE <= 0 or BATCH_SIZE > self.y_train.shape[0]:
-                # batch descent case
-                BATCH_SIZE = self.y_train.shape[0]
-        self.batch_size = BATCH_SIZE
+        self.opt_class.initialize()
+        self.opt_class.batch_size(BATCH_SIZE)
         step_acc = 0
         step_err = 0
         ep = 0
@@ -205,7 +199,7 @@ class MLP:
             # Epoch ep
             ep += 1
             # Gradient descent
-            step_acc, step_err = self.gradient_descent(ep, gamma=l, batch_size=BATCH_SIZE)
+            step_acc, step_err = self.gradient_descent(ep, gamma=l, batch_size=self.batch_size)
             # Evaluate the MLP on the validation data
             y_proba_val = self.predict_proba(X_val)
             y_pred_val = self.predict(X_val)
@@ -241,11 +235,7 @@ class MLP:
         for key in self.Weights.keys():
             self.Weights[key] = np.random.rand(self.Weights[key].shape[0], self.Weights[key].shape[1]) - 0.5
             self.Bias[key] = np.random.rand(self.Bias[key].shape[0], self.Bias[key].shape[1]) - 0.5
-        if self.optimizer == "rmsprop" or self.optimizer == "adam":
-            self.Sw[key] = {}
-            self.Sb[key] = {}
-            self.Vw[key] = {}
-            self.Vb[key] = {}
+        self.opt_class.initialize()
 
 
     def training_curve(self):
@@ -396,34 +386,10 @@ class MLP:
         :param gamma: learning rate
         :return:
         """
-        if self.optimizer == "rmsprop" :
-            beta_2 = 0.9
-            eps = 1e-8
-            for key in self.Weights:
-                self.Sw[key] = beta_2* self.Sw[key] + (1-beta_2) * dW[key] ** 2
-                self.Sb[key] = beta_2 * self.Sb[key] +(1-beta_2) * dB[key] ** 2
-                self.Weights[key] -= gamma * dW[key]  * 1 / np.sqrt(self.Sw[key] + eps)
-                self.Bias[key] -= gamma  * dB[key] * 1/np.sqrt(self.Sb[key] + eps)
-
-        elif self.optimizer == 'adam':
-            beta_1 = 0.9
-            beta_2 = 0.9
-            eps = 1e-8
-            for key in self.Weights:
-                self.Vw[key] = beta_1 * self.Vw[key] + (1 - beta_1) * dW[key]
-                self.Vb[key] = beta_1 * self.Vb[key] + (1 - beta_1) * dB[key]
-                Vw_corr = self.Vw[key] / (1 - beta_1 ** epoch)
-                Vb_corr = self.Vb[key] / (1 - beta_1 ** epoch)
-                self.Sw[key] = beta_2 * self.Sw[key] + (1 - beta_2) * dW[key] ** 2
-                self.Sb[key] = beta_2 * self.Sb[key] + (1 - beta_2) * dB[key] ** 2
-                Sw_corr = self.Sw[key] / (1 - beta_2 ** epoch)
-                Sb_corr = self.Sb[key] / (1 - beta_2 ** epoch)
-                self.Weights[key] -= gamma * Vw_corr * 1 / np.sqrt(Sw_corr + eps)
-                self.Bias[key] -= gamma * Vb_corr * 1 / np.sqrt(Sb_corr + eps)
-        else :
-            for key in self.Weights:
-                self.Weights[key] -=  gamma * dW[key]
-                self.Bias[key] -= gamma * dB[key]
+        for key in self.Weights:
+            self.opt_class.update(key, dW, dB)
+            self.Weights[key] -= gamma * self.opt_class.weight_factor(key, dW, epoch)
+            self.Bias[key] -= gamma * self.opt_class.bias_factor(key, dB, epoch)
         return self.Weights, self.Bias
 
 
