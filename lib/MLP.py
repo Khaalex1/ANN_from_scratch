@@ -3,6 +3,7 @@ import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import datetime
 import matplotlib.pyplot as plt
 import ActivationFunction, Loss
+from MinMax import MinMax
 
 
 def accuracy(predicted, ground_truth):
@@ -52,6 +53,32 @@ def dot_col(y, A):
         d[col] = y[:, col].dot(A[:, col])
     return d
 
+def K_fold_separation(X, y, K=10):
+    nb_samp = y.size
+    test_size = nb_samp // K
+    Test_sets = []
+    Test_y = []
+    Train_sets = []
+    Train_y = []
+    for i in range(K):
+        Test_sets.append(X[i * test_size:(i + 1) * test_size, :])
+        Test_y.append(y[i * test_size:(i + 1) * test_size])
+        if i == 0:
+            Train_sets.append(X[(i + 1) * test_size:, :])
+            Train_y.append(y[(i + 1) * test_size:])
+        elif i == (K - 1):
+            Train_sets.append(X[:(i) * test_size, :])
+            Train_y.append(y[:(i) * test_size])
+        else:
+            X_train = np.vstack((X[:i * test_size, :], X[(i + 1) * test_size:, :]))
+            if len(y.shape) < 2:
+                Y_train = np.hstack((y[:(i) * test_size], y[(i + 1) * test_size:]))
+            else:
+                Y_train = np.vstack((y[:(i) * test_size], y[(i + 1) * test_size:]))
+            Train_sets.append(X_train)
+            Train_y.append(Y_train)
+    return Train_sets, Train_y, Test_sets, Test_y
+
 
 class MLP:
     def __init__(self):
@@ -76,10 +103,10 @@ class MLP:
         # For the validaiton data the values are computed at each epoch
         self.history['val_acc'] = []
         self.history['val_loss'] = []
-        self.epochs = None
 
         self.loss = None
         self.optimizer = None
+        self.batch_size = 0
 
         self.Eb = {}
         self.Ew = {}
@@ -111,7 +138,7 @@ class MLP:
 
 
 
-    def fit(self, X, y, BATCH_SIZE=32, EPOCHS=300, val_split=0.3, l=0.001):
+    def fit(self, X, y, BATCH_SIZE=32, EPOCHS=300, val_split=0.3, l=0.001, print_res = True):
         """
         Training of the MLP (fitting the weights with gradient descent)
         :param X: training data matrix(n_samples,n_features)
@@ -121,8 +148,6 @@ class MLP:
         :param EPOCHS: number of EPOCHS for training (default to 300)
         :param val_split : percentage of the input data to split into validation data (default to 0.3)
         :param l: learning rate of the gradient descent (default to 0.001)
-        :param reg_L2: L2 regularization of the gradient descent (default to 0 - no regularization)
-        :param corr: ??
         :return:
         """
 
@@ -149,8 +174,6 @@ class MLP:
         self.nb_feat = X_train.shape[1]
         self.nb_class = int(y_train.max() + 1)
 
-        self.accuracy = []
-        self.loss = []
         # Check the BATCH_SIZE
         if self.optimizer == "batch":
             BATCH_SIZE = self.y_train.shape[0]
@@ -164,13 +187,15 @@ class MLP:
             if BATCH_SIZE <= 0 or BATCH_SIZE > self.y_train.shape[0]:
                 # batch descent case
                 BATCH_SIZE = self.y_train.shape[0]
+        self.batch_size = BATCH_SIZE
         step_acc = 0
         step_err = 0
         ep = 0
-        print("batch size = ", BATCH_SIZE)
-        print("loss function : ", self.loss)
-        print('---' * 10)
-        print('Training...')
+        if print_res:
+            print("batch size = ", BATCH_SIZE)
+            print("loss function : ", self.loss)
+            print('---' * 10)
+            print('Training...')
         t0 = datetime.datetime.now()
         while ep < EPOCHS :
             # Epoch ep
@@ -189,17 +214,20 @@ class MLP:
             self.history['val_acc'].append(val_acc)
             self.history['val_loss'].append(val_err)
 
-            # Print the training metrics
-            if ep == 1 or ep % 10 == 0:
-                print("Epoch : {},  acc : {} - loss : {} - val accuracy : {} - val loss : {}".format(ep, step_acc,
+
+            if print_res:
+                # Print the training metrics
+                if ep == 1 or ep % 10 == 0:
+                    print("Epoch : {},  acc : {} - loss : {} - val accuracy : {} - val loss : {}".format(ep, step_acc,
                                                                                                      step_err, val_acc,
-                                                                                                     val_err))
-        tf = datetime.datetime.now() - t0
-        print('Training time (hh:mm:ss): {}'.format(tf))
-        print('---' * 10)
-        self.epochs = np.linspace(1, EPOCHS, len(self.history['acc']))
-        print('Last epoch :')
-        print("Epoch : {},  Batch accuracy : {} - Batch error = {}".format(ep, step_acc, step_err))
+                                                                                                         val_err))
+        if print_res:
+            tf = datetime.datetime.now() - t0
+            print('Training time (hh:mm:ss): {}'.format(tf))
+            print('---' * 10)
+            print('Last epoch :')
+            print("Epoch : {},  Batch accuracy : {} - Batch error = {}".format(ep, step_acc, step_err))
+
 
 
     def reinitialize(self):
@@ -209,6 +237,9 @@ class MLP:
         for key in self.Weights.keys():
             self.Weights[key] = np.random.rand(self.Weights[key].shape[0], self.Weights[key].shape[1]) - 0.5
             self.Bias[key] = np.random.rand(self.Bias[key].shape[0], self.Bias[key].shape[1]) - 0.5
+        if self.optimizer == "rmsprop":
+            self.Ew[key] = {}
+            self.Eb[key] = {}
 
 
     def training_curve(self):
@@ -216,7 +247,7 @@ class MLP:
         Plot the evolution of the metrics (accuracy and loss) during training
         """
         figure, ax = plt.subplots(1, 2, figsize=(10, 5))
-        ax[0].set_title('Accuracy in function of epoch')
+        ax[0].set_title('Accuracy in function of epoch \n loss = {},\n optimizer = {},\n batch size = {}'.format(self.loss, self.optimizer, self.batch_size))
         ax[0].plot(self.history['acc'], color='blue', label='train data')
         ax[0].plot(self.history['val_acc'], color='orange', label='val data')
         ax[0].grid()
@@ -228,7 +259,7 @@ class MLP:
         ax[1].plot(self.history['val_loss'], color='orange', label='val data')
         ax[1].set_xlabel('epochs')
         ax[1].set_ylabel('error')
-        ax[1].set_title('Error (/loss) in function of epoch')
+        ax[1].set_title('Error in function of epoch \n loss = {},\n optimizer = {},\n batch size = {}'.format(self.loss, self.optimizer, self.batch_size))
         ax[1].legend()
         figure.tight_layout(pad=3.0)
 
@@ -352,7 +383,7 @@ class MLP:
 
         return dW, dB
 
-    def update_parameters(self, dW, dB, gamma, batch_size=32):
+    def update_parameters(self, dW, dB, gamma, batch_size=1):
         """
         Update the parameters of the MLP
         :param dW: partial derivative of the cost in relation of the weights W
@@ -447,6 +478,21 @@ class MLP:
             # softmax
             return np.argmax(y_proba, 0)
 
+    def Kfold_simulation(self, X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=300, l=0.01):
+        Train_sets, Train_y, Test_sets, Test_y = K_fold_separation(X, y, K=Kfold)
+        acc = []
+        for i in range(Kfold):
+            self.reinitialize()
+            self.fit(Train_sets[i], Train_y[i], BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCHS, l=l, print_res=False)
+            y_pred = self.predict(Test_sets[i])
+            acci = accuracy(y_pred, Test_y[i])
+            acc.append(acci)
+            print("Test set {}: Accuracy = {} ".format(i, acci))
+
+        avg_acc = np.mean(acc)
+        print("Average accuracy by X-validation = ", avg_acc)
+        return avg_acc
+
 if __name__ == "__main__":
     #  ------------------------------------------------------
     # TEST
@@ -473,25 +519,27 @@ if __name__ == "__main__":
     nb_train = int(0.8 * nb_samp)
 
     X_train = data[:nb_train, :nb_feat]
-    # pseudo min-max normalization
-    X_train /= X_train.max(axis=0)
-    Y_train = data[:nb_train, nb_feat].astype('int')
-
     X_test = data[nb_train:, :nb_feat]
-    X_test /= X_test.max(axis=0)
+
+    Y_train = data[:nb_train, nb_feat].astype('int')
     Y_test = data[nb_train:, nb_feat].astype('int')
 
-    """AN = MLP()
+    #MinMax normalization
+    MM = MinMax()
+    X_train = MM.fit_transform(X_train)
+    X_test = MM.transform(X_test)
+
+    AN = MLP()
     AN.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=32, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=1, activation='tanh')
     AN.compile(optimizer="rmsprop", loss = "binary_cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=300, l=0.001)
-    AN.training_curve()"""
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=150, l=0.001)
+    AN.training_curve()
 
-    AN = MLP()
+    """AN = MLP()
     AN.add_layer(nb_nodes=100, feat_size=nb_feat, activation='relu')
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=100, activation='relu')
@@ -506,11 +554,21 @@ if __name__ == "__main__":
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=2, activation='softmax')
     AN.compile(optimizer="rmsprop", loss="cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=300, l=0.001)
-    AN.training_curve()
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=100, l=0.01)
+    AN.training_curve()"""
 
 
     y_pred = AN.predict(X_test)
-    print('---'*10)
     print("Accuracy on Test set :", accuracy(y_pred, Y_test))
     # use the same conditions to compute the accuracy for the test as for the training and val data (check the instance and encode in one hot if needed)
+
+
+    # -----------------------------------------
+    # K-fold cross-validation
+    # -----------------------------------------
+    print('---'*10)
+    print("K-fold Cross-Validation")
+    M = MinMax()
+    X = M.fit_transform(data[:,:-1])
+    y = data[:,-1]
+    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=150)
