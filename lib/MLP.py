@@ -378,7 +378,7 @@ class MLP:
 
         return dW, dB
 
-    def update_parameters(self, dW, dB, gamma, epoch):
+    def update_parameters(self, dW, dB, gamma, iteration):
         """
         Update the parameters of the MLP
         :param dW: partial derivative of the cost in relation of the weights W
@@ -388,8 +388,8 @@ class MLP:
         """
         for key in self.Weights:
             self.opt_class.update(key, dW, dB)
-            self.Weights[key] -= gamma * self.opt_class.weight_factor(key, dW, epoch)
-            self.Bias[key] -= gamma * self.opt_class.bias_factor(key, dB, epoch)
+            self.Weights[key] -= gamma * self.opt_class.weight_factor(key, dW, iteration)
+            self.Bias[key] -= gamma * self.opt_class.bias_factor(key, dB, iteration)
         return self.Weights, self.Bias
 
 
@@ -536,7 +536,7 @@ if __name__ == "__main__":
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=2, activation='softmax')
     AN.compile(optimizer="adam", loss = "cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=200, l=0.001)
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=20, l=0.001)
     AN.training_curve()
 
     """AN = MLP()
@@ -571,4 +571,4 @@ if __name__ == "__main__":
     M = MinMax()
     X = M.fit_transform(data[:,:-1])
     y = data[:,-1]
-    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=200)
+    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=20)
