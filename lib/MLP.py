@@ -396,26 +396,30 @@ class MLP:
         :param gamma: learning rate
         :return:
         """
-        if self.optimizer == "rmsprop" or self.optimizer == "adam":
-            beta_1 = 0.9
+        if self.optimizer == "rmsprop" :
             beta_2 = 0.9
             eps = 1e-8
             for key in self.Weights:
                 self.Sw[key] = beta_2* self.Sw[key] + (1-beta_2) * dW[key] ** 2
                 self.Sb[key] = beta_2 * self.Sb[key] +(1-beta_2) * dB[key] ** 2
-                if self.optimizer == "rmsprop":
-                    self.Weights[key] -= gamma * dW[key]  * 1 / np.sqrt(self.Sw[key] + eps)
-                    self.Bias[key] -= gamma  * dB[key] * 1/np.sqrt(self.Sb[key] + eps)
-                else :
-                    #adam
-                    self.Vw[key] = beta_1 * self.Vw[key] + (1 - beta_1) * dW[key]
-                    self.Vb[key] = beta_1 * self.Vb[key] + (1 - beta_1) * dB[key]
-                    Vw_corr = self.Vw[key] / (1-beta_1**epoch)
-                    Vb_corr = self.Vb[key] / (1 - beta_1 ** epoch)
-                    Sw_corr = self.Sw[key] / (1 - beta_2 ** epoch)
-                    Sb_corr = self.Sb[key] / (1 - beta_2 ** epoch)
-                    self.Weights[key] -= gamma  * Vw_corr * 1 / np.sqrt(Sw_corr + eps)
-                    self.Bias[key] -= gamma  * Vb_corr * 1 / np.sqrt(Sb_corr + eps)
+                self.Weights[key] -= gamma * dW[key]  * 1 / np.sqrt(self.Sw[key] + eps)
+                self.Bias[key] -= gamma  * dB[key] * 1/np.sqrt(self.Sb[key] + eps)
+
+        elif self.optimizer == 'adam':
+            beta_1 = 0.9
+            beta_2 = 0.9
+            eps = 1e-8
+            for key in self.Weights:
+                self.Vw[key] = beta_1 * self.Vw[key] + (1 - beta_1) * dW[key]
+                self.Vb[key] = beta_1 * self.Vb[key] + (1 - beta_1) * dB[key]
+                Vw_corr = self.Vw[key] / (1 - beta_1 ** epoch)
+                Vb_corr = self.Vb[key] / (1 - beta_1 ** epoch)
+                self.Sw[key] = beta_2 * self.Sw[key] + (1 - beta_2) * dW[key] ** 2
+                self.Sb[key] = beta_2 * self.Sb[key] + (1 - beta_2) * dB[key] ** 2
+                Sw_corr = self.Sw[key] / (1 - beta_2 ** epoch)
+                Sb_corr = self.Sb[key] / (1 - beta_2 ** epoch)
+                self.Weights[key] -= gamma * Vw_corr * 1 / np.sqrt(Sw_corr + eps)
+                self.Bias[key] -= gamma * Vb_corr * 1 / np.sqrt(Sb_corr + eps)
         else :
             for key in self.Weights:
                 self.Weights[key] -=  gamma * dW[key]
