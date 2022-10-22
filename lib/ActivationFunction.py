@@ -32,7 +32,7 @@ class Sigmoid(ActivationFunction):
     Sigmoid (or logistic) function sigmoid(x) = 1/(1+exp(-z))
     """
     def value(self, z):
-        return 1 / (1 + np.exp(-z))
+        return (1 / (1 + np.exp(-z)))
 
     def derivative(self, z):
         return self.value(z) * (1 - self.value(z))

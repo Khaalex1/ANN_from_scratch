@@ -107,13 +107,15 @@ class MLP:
         self.optimizer = None
         self.batch_size = 0
 
-        self.Eb = {}
-        self.Ew = {}
+        self.Sb = {}
+        self.Sw = {}
+        self.Vb = {}
+        self.Vw = {}
 
     def compile(self, optimizer="sgd", loss = 'cross_entropy'):
-        if optimizer not in ["sgd", "batch", "minibatch", "rmsprop"]:
+        if optimizer not in ["sgd", "batch", "minibatch", "rmsprop", "adam"]:
             print("Warning ! Specified optimizer is not recognized.")
-            print("List of recognized optimizers : 'sgd', 'batch', 'minibatch', 'rmsprop'.")
+            print("List of recognized optimizers : 'sgd', 'batch', 'minibatch', 'rmsprop', 'adam'.")
             print("Optimizer 'minibatch' is taken by default.")
             optimizer = 'minibatch'
         self.optimizer = optimizer
@@ -180,9 +182,11 @@ class MLP:
             BATCH_SIZE = 1
         else :
             # minibatch / rmsprop
-            if self.optimizer == "rmsprop":
-                self.Eb = {key:0 for key in self.Bias.keys()}
-                self.Ew = {key:0 for key in self.Weights.keys()}
+            if self.optimizer == "rmsprop" or self.optimizer =="adam":
+                self.Sb = {key:0 for key in self.Bias.keys()}
+                self.Sw = {key:0 for key in self.Weights.keys()}
+                self.Vb = {key: 0 for key in self.Bias.keys()}
+                self.Vw = {key: 0 for key in self.Weights.keys()}
             if BATCH_SIZE <= 0 or BATCH_SIZE > self.y_train.shape[0]:
                 # batch descent case
                 BATCH_SIZE = self.y_train.shape[0]
@@ -191,8 +195,9 @@ class MLP:
         step_err = 0
         ep = 0
         if print_res:
-            print("batch size = ", BATCH_SIZE)
+            print("batch size = ", self.batch_size)
             print("loss function : ", self.loss)
+            print("optimizer : ", self.optimizer)
             print('---' * 10)
             print('Training...')
         t0 = datetime.datetime.now()
@@ -200,7 +205,7 @@ class MLP:
             # Epoch ep
             ep += 1
             # Gradient descent
-            step_acc, step_err = self.gradient_descent(gamma=l, batch_size=BATCH_SIZE)
+            step_acc, step_err = self.gradient_descent(ep, gamma=l, batch_size=BATCH_SIZE)
             # Evaluate the MLP on the validation data
             y_proba_val = self.predict_proba(X_val)
             y_pred_val = self.predict(X_val)
@@ -236,9 +241,11 @@ class MLP:
         for key in self.Weights.keys():
             self.Weights[key] = np.random.rand(self.Weights[key].shape[0], self.Weights[key].shape[1]) - 0.5
             self.Bias[key] = np.random.rand(self.Bias[key].shape[0], self.Bias[key].shape[1]) - 0.5
-        if self.optimizer == "rmsprop":
-            self.Ew[key] = {}
-            self.Eb[key] = {}
+        if self.optimizer == "rmsprop" or self.optimizer == "adam":
+            self.Sw[key] = {}
+            self.Sb[key] = {}
+            self.Vw[key] = {}
+            self.Vb[key] = {}
 
 
     def training_curve(self):
@@ -381,7 +388,7 @@ class MLP:
 
         return dW, dB
 
-    def update_parameters(self, dW, dB, gamma):
+    def update_parameters(self, dW, dB, gamma, epoch):
         """
         Update the parameters of the MLP
         :param dW: partial derivative of the cost in relation of the weights W
@@ -389,12 +396,26 @@ class MLP:
         :param gamma: learning rate
         :return:
         """
-        if self.optimizer == "rmsprop":
+        if self.optimizer == "rmsprop" or self.optimizer == "adam":
+            beta_1 = 0.9
+            beta_2 = 0.9
+            eps = 1e-8
             for key in self.Weights:
-                self.Ew[key] = 0.9 * self.Ew[key] + 0.1 * dW[key] ** 2
-                self.Weights[key] -= gamma * 1/(np.sqrt(self.Ew[key]) + 1e-8) * dW[key]
-                self.Eb[key] = 0.9 * self.Eb[key] + 0.1 * dB[key] ** 2
-                self.Bias[key] -= gamma * 1/(np.sqrt(self.Eb[key] )+ 1e-8) * dB[key]
+                self.Sw[key] = beta_2* self.Sw[key] + (1-beta_2) * dW[key] ** 2
+                self.Sb[key] = beta_2 * self.Sb[key] +(1-beta_2) * dB[key] ** 2
+                if self.optimizer == "rmsprop":
+                    self.Weights[key] -= gamma * dW[key]  * 1 / np.sqrt(self.Sw[key] + eps)
+                    self.Bias[key] -= gamma  * dB[key] * 1/np.sqrt(self.Sb[key] + eps)
+                else :
+                    #adam
+                    self.Vw[key] = beta_1 * self.Vw[key] + (1 - beta_1) * dW[key]
+                    self.Vb[key] = beta_1 * self.Vb[key] + (1 - beta_1) * dB[key]
+                    Vw_corr = self.Vw[key] / (1-beta_1**epoch)
+                    Vb_corr = self.Vb[key] / (1 - beta_1 ** epoch)
+                    Sw_corr = self.Sw[key] / (1 - beta_2 ** epoch)
+                    Sb_corr = self.Sb[key] / (1 - beta_2 ** epoch)
+                    self.Weights[key] -= gamma  * Vw_corr * 1 / np.sqrt(Sw_corr + eps)
+                    self.Bias[key] -= gamma  * Vb_corr * 1 / np.sqrt(Sb_corr + eps)
         else :
             for key in self.Weights:
                 self.Weights[key] -=  gamma * dW[key]
@@ -402,7 +423,7 @@ class MLP:
         return self.Weights, self.Bias
 
 
-    def gradient_descent(self, gamma=0.001,
+    def gradient_descent(self, epoch, gamma=0.001,
                           batch_size=1):
         """
         General gradient descent algorithm
@@ -425,7 +446,7 @@ class MLP:
             Z, out = self.forward_propagation(X_batch.T)
             # Backpropagation
             dW, dB = self.back_propagation(Z, out, Y_batch)
-            self.update_parameters(dW, dB, gamma)
+            self.update_parameters(dW, dB, gamma, epoch)
             y = Y_batch
             a = out[self.counter]
             if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
@@ -542,9 +563,9 @@ if __name__ == "__main__":
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=32, activation='relu')
     AN.BatchNormalization()
-    AN.add_layer(nb_nodes=1, activation='tanh')
-    AN.compile(optimizer="rmsprop", loss = "binary_cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=150, l=0.001)
+    AN.add_layer(nb_nodes=1, activation='sigmoid')
+    AN.compile(optimizer="adam", loss = "binary_cross_entropy")
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=20, l=0.001)
     AN.training_curve()
 
     """AN = MLP()
@@ -579,4 +600,4 @@ if __name__ == "__main__":
     M = MinMax()
     X = M.fit_transform(data[:,:-1])
     y = data[:,-1]
-    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=150)
+    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=20)

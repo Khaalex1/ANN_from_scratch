@@ -46,9 +46,9 @@ class CrossEntropy(Loss):
         else:
             m = y.shape[0]
         if self.binary:
-            return(1/m)*np.sum(-y*np.log(a) - (1-y)*np.log(1-a))
+            return(1/m)*np.sum(-y*np.log(a+1e-7) - (1-y)*np.log(1-a+1e-7))
 
-        return (1/m)*np.sum(-y*np.log(a))
+        return (1/m)*np.sum(-y*np.log(a+1e-7))
 
     def derivative(self, y, a):
         return (a - y) / (a * (1 - a))
