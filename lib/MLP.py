@@ -416,7 +416,8 @@ class MLP:
             Z, out = self.forward_propagation(X_batch.T)
             # Backpropagation
             dW, dB = self.back_propagation(Z, out, Y_batch)
-            self.update_parameters(dW, dB, gamma, epoch)
+            t = self.batch_size*epoch + i
+            self.update_parameters(dW, dB, gamma, t)
             y = Y_batch
             a = out[self.counter]
             if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
@@ -533,9 +534,9 @@ if __name__ == "__main__":
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=32, activation='relu')
     AN.BatchNormalization()
-    AN.add_layer(nb_nodes=1, activation='sigmoid')
-    AN.compile(optimizer="adam", loss = "binary_cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=20, l=0.001)
+    AN.add_layer(nb_nodes=2, activation='softmax')
+    AN.compile(optimizer="adam", loss = "cross_entropy")
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=200, l=0.001)
     AN.training_curve()
 
     """AN = MLP()
@@ -570,4 +571,4 @@ if __name__ == "__main__":
     M = MinMax()
     X = M.fit_transform(data[:,:-1])
     y = data[:,-1]
-    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=20)
+    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=200)

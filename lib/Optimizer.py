@@ -46,10 +46,10 @@ class RMSPROP(Optimizer):
         self.Sw[key] = self.beta_2 * self.Sw[key] + (1 - self.beta_2) * dW[key] ** 2
         self.Sb[key] = self.beta_2 * self.Sb[key] + (1 - self.beta_2) * dB[key] ** 2
 
-    def weight_factor(self, key, dW, epoch):
+    def weight_factor(self, key, dW, t):
         return dW[key]  * 1 / np.sqrt(self.Sw[key] + self.eps)
 
-    def bias_factor(self, key, dB, epoch):
+    def bias_factor(self, key, dB, t):
         return dB[key] * 1/np.sqrt(self.Sb[key] + self.eps)
 
 
@@ -86,15 +86,15 @@ class ADAM(Optimizer):
         self.Sw[key] = self.beta_2 * self.Sw[key] + (1 - self.beta_2) * dW[key] ** 2
         self.Sb[key] = self.beta_2 * self.Sb[key] + (1 - self.beta_2) * dB[key] ** 2
 
-    def weight_factor(self, key, dW, epoch):
-        Vw_corr = self.Vw[key] / (1 - self.beta_1 ** epoch)
-        Sw_corr = self.Sw[key] / (1 - self.beta_2 ** epoch)
+    def weight_factor(self, key, dW, t):
+        Vw_corr = self.Vw[key] / (1 - self.beta_1 ** t)
+        Sw_corr = self.Sw[key] / (1 - self.beta_2 ** t)
         return Vw_corr * 1 / np.sqrt(Sw_corr + self.eps)
 
 
-    def bias_factor(self, key, dB, epoch):
-        Vb_corr = self.Vb[key] / (1 - self.beta_1 ** epoch)
-        Sb_corr = self.Sb[key] / (1 - self.beta_2 ** epoch)
+    def bias_factor(self, key, dB, t):
+        Vb_corr = self.Vb[key] / (1 - self.beta_1 ** t)
+        Sb_corr = self.Sb[key] / (1 - self.beta_2 ** t)
         return Vb_corr * 1 / np.sqrt(Sb_corr + self.eps)
 
 
@@ -122,10 +122,10 @@ class Minibatch(Optimizer):
     def update(self, key, dW, dB):
         pass
 
-    def weight_factor(self, key, dW, epoch):
+    def weight_factor(self, key, dW, t):
         return dW[key]
 
-    def bias_factor(self, key, dB, epoch):
+    def bias_factor(self, key, dB, t):
         return dB[key]
 
     def initialize(self):
