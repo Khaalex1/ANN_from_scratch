@@ -112,7 +112,7 @@ class MLP:
         self.Vb = {}
         self.Vw = {}
 
-    def compile(self, optimizer="sgd", loss = 'cross_entropy'):
+    def compile(self, optimizer="minibatch", loss = 'cross_entropy'):
         if optimizer not in ["sgd", "batch", "minibatch", "rmsprop", "adam"]:
             print("Warning ! Specified optimizer is not recognized.")
             print("List of recognized optimizers : 'sgd', 'batch', 'minibatch', 'rmsprop', 'adam'.")
