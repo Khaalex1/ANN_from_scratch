@@ -392,9 +392,9 @@ class MLP:
         if self.optimizer == "rmsprop":
             for key in self.Weights:
                 self.Ew[key] = 0.9 * self.Ew[key] + 0.1 * dW[key] ** 2
-                self.Weights[key] -= gamma * 1/np.sqrt(self.Ew[key] + 1e-8) * dW[key]
+                self.Weights[key] -= gamma * 1/(np.sqrt(self.Ew[key]) + 1e-8) * dW[key]
                 self.Eb[key] = 0.9 * self.Eb[key] + 0.1 * dB[key] ** 2
-                self.Bias[key] -= gamma * 1/np.sqrt(self.Eb[key] + 1e-8) * dB[key]
+                self.Bias[key] -= gamma * 1/(np.sqrt(self.Eb[key] )+ 1e-8) * dB[key]
         else :
             for key in self.Weights:
                 self.Weights[key] -=  gamma * dW[key]
