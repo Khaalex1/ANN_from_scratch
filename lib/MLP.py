@@ -13,8 +13,6 @@ def accuracy(predicted, ground_truth):
     :param ground_truth: the ground-truth values
     :return: the accuracy (between 0 and 1)
     """
-    #TODO : Add the check of conditions to know if it is needed to encode with one_hot or no
-    # Maybe it could be more pertinent to add this in the prediciotn function ?
     acc = np.sum(predicted == ground_truth) / ground_truth.shape[0]
     return acc
 
@@ -22,9 +20,9 @@ def accuracy(predicted, ground_truth):
 def one_hot(y, nb_class=2):
     """
     One hot encoding
-    :param y: vector to encode
+    :param y: label vector to encode
     :param nb_class: number of classes
-    :return:
+    :return: one hot encoded vector of shape (nb_class, nb_samples)
     """
     nb_samp = y.shape[0]
     y_one_hot = np.zeros((nb_class, nb_samp))
@@ -45,15 +43,16 @@ def batchNorm(Z):
     else:
         return (Z - m) / std
 
-
-def dot_col(y, A):
-    C = y.shape[1]
-    d = np.zeros((C))
-    for col in range(C):
-        d[col] = y[:, col].dot(A[:, col])
-    return d
-
 def K_fold_separation(X, y, K=10):
+    """
+    K fold separation of training set
+    :param X: Training set
+    :param y: Label vector
+    :param K: Number of folds acquired from the K fold separation
+    :return: Train_sets, Train_y 3D arrays
+             Test_sets, Test_y 2D arrays
+             The 1st dim corresponds to each fold
+    """
     nb_samp = y.size
     test_size = nb_samp // K
     Test_sets = []
@@ -138,7 +137,7 @@ class MLP:
 
 
 
-    def fit(self, X, y, BATCH_SIZE=32, EPOCHS=300, val_split=0.3, l=0.001, print_res = True):
+    def fit(self, X, y, BATCH_SIZE=1, EPOCHS=300, val_split=0.3, l=0.001, print_res = True):
         """
         Training of the MLP (fitting the weights with gradient descent)
         :param X: training data matrix(n_samples,n_features)
@@ -294,7 +293,7 @@ class MLP:
         """
         Add a layer to the Multi-Layer Perceptron NN
         :param nb_nodes: number of neurons in the layers
-        :param feat_size: input shape ?
+        :param feat_size: input shape (number of features)
         :param activation: activation function of the neurons in the layer
         :return:
         """
@@ -319,11 +318,10 @@ class MLP:
             last_lay_nodes = self.Weights[self.counter - 1].shape[0]
             self.Weights[self.counter] = np.random.rand(nb_nodes, last_lay_nodes) - 0.5
             self.Bias[self.counter] = np.random.rand(nb_nodes, 1) - 0.5
-        print("Added Layer shape : ", self.Weights[self.counter].shape)  # print (input shape output shape) ?
+        print("Added Layer shape : ", self.Weights[self.counter].shape)
 
     def BatchNormalization(self):
         self.postProcess[self.counter] = batchNorm
-
 
     def forward_propagation(self, X):
         """
@@ -383,14 +381,12 @@ class MLP:
 
         return dW, dB
 
-    def update_parameters(self, dW, dB, gamma, batch_size=1):
+    def update_parameters(self, dW, dB, gamma):
         """
         Update the parameters of the MLP
         :param dW: partial derivative of the cost in relation of the weights W
         :param dB: partial derivative of the cost in relation of the bias B
         :param gamma: learning rate
-        :param batch_size: number of samples for each batch (default to 1 - Stochastic Gradient Descent)
-        :param reg_L2:
         :return:
         """
         if self.optimizer == "rmsprop":
@@ -406,16 +402,12 @@ class MLP:
         return self.Weights, self.Bias
 
 
-    def gradient_descent(self, gamma=0.1,
+    def gradient_descent(self, gamma=0.001,
                           batch_size=1):
         """
         General gradient descent algorithm
         :param gamma: learning rate
         :param epochs: number of epochs
-        :param acc: maximum accuracy to stop the training
-        :param reg_L2: L2 regularization
-        :param corr:
-        :param loss: Loss function to use
         :param batch_size: number of samples in each batch (default to 1 - Stochastic Gradient Descent)
         :return:
         """
@@ -433,7 +425,7 @@ class MLP:
             Z, out = self.forward_propagation(X_batch.T)
             # Backpropagation
             dW, dB = self.back_propagation(Z, out, Y_batch)
-            self.update_parameters(dW, dB, gamma, batch_size=batch_size)
+            self.update_parameters(dW, dB, gamma)
             y = Y_batch
             a = out[self.counter]
             if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
@@ -469,6 +461,11 @@ class MLP:
         return out[self.counter]
 
     def predict(self, X):
+        """
+        Prediction in terms of class of the MLP Neural Network
+        :param X: input of the MLP
+        :return: predicted labels. Threshold of 0.5 for logistic/pseudo-tanh regression
+        """
         y_proba = self.predict_proba(X)
         if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
             return (y_proba >= 0.5).astype('int')
@@ -479,6 +476,17 @@ class MLP:
             return np.argmax(y_proba, 0)
 
     def Kfold_simulation(self, X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=300, l=0.01):
+        """
+        Simulate the K fold cross validation on the data. At each step (0 to K-1),
+        accuracy on current test set is displayed.
+        :param X: Train set / feature array (2D)
+        :param y: Label vector (1D)
+        :Kfold: Number of separate folds wanted from original data
+        :BATCH_SIZE: batch size
+        :EPOCHS: Training number of epochs
+        :l: learning rate
+        :return: Average accuracy on all test sets
+        """
         Train_sets, Train_y, Test_sets, Test_y = K_fold_separation(X, y, K=Kfold)
         acc = []
         for i in range(Kfold):
