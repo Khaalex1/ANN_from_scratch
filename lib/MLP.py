@@ -536,7 +536,7 @@ if __name__ == "__main__":
     AN.BatchNormalization()
     AN.add_layer(nb_nodes=2, activation='softmax')
     AN.compile(optimizer="adam", loss = "cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=20, l=0.001)
+    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=100, l=0.001)
     AN.training_curve()
 
     """AN = MLP()
@@ -571,4 +571,4 @@ if __name__ == "__main__":
     M = MinMax()
     X = M.fit_transform(data[:,:-1])
     y = data[:,-1]
-    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=20)
+    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=100)
