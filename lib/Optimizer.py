@@ -12,11 +12,11 @@ class Optimizer(ABC):
         pass
 
     @abstractmethod
-    def weight_factor(self, key, dW, dB, epoch):
+    def weight_factor(self, key, dW, epoch):
         pass
 
     @abstractmethod
-    def bias_factor(self, key, dW, dB, epoch):
+    def bias_factor(self, key, dB, epoch):
         pass
 
     @abstractmethod
@@ -41,7 +41,7 @@ class RMSPROP(Optimizer):
 
     def batch_size(self, size=32):
         if size <= 0 or size > self.MLP.X_train.shape[0]:
-            self.MLP.batch_size = X_train.shape[0]
+            self.MLP.batch_size = self.MLP.X_train.shape[0]
         else:
             self.MLP.batch_size = size
 
@@ -81,7 +81,7 @@ class ADAM(Optimizer):
 
     def batch_size(self, size=32):
         if size <= 0 or size > self.MLP.X_train.shape[0]:
-            self.MLP.batch_size = X_train.shape[0]
+            self.MLP.batch_size = self.MLP.X_train.shape[0]
         else:
             self.MLP.batch_size = size
 
@@ -114,7 +114,7 @@ class Minibatch(Optimizer):
 
     def batch_size(self, size=32):
         if size <= 0 or size > self.MLP.X_train.shape[0]:
-            self.MLP.batch_size = X_train.shape[0]
+            self.MLP.batch_size = self.MLP.X_train.shape[0]
         else:
             self.MLP.batch_size = size
 
