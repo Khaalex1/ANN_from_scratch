@@ -35,6 +35,10 @@ class RMSPROP(Optimizer):
         self.beta_2 = beta_2
         self.eps = eps
 
+    def initialize(self):
+        self.Sb = {key: 0 for key in self.MLP.Weights.keys()}
+        self.Sw = {key: 0 for key in self.MLP.Weights.keys()}
+
     def batch_size(self, size=32):
         if size <= 0 or size > self.MLP.X_train.shape[0]:
             self.MLP.batch_size = X_train.shape[0]
@@ -53,10 +57,6 @@ class RMSPROP(Optimizer):
         return dB[key] * 1/np.sqrt(self.Sb[key] + self.eps)
 
 
-    def initialize(self):
-        self.Sb = {key: 0 for key in self.MLP.Weights.keys()}
-        self.Sw = {key: 0 for key in self.MLP.Weights.keys()}
-
 
 class ADAM(Optimizer):
     """
@@ -73,6 +73,11 @@ class ADAM(Optimizer):
         self.beta_2 = beta_2
         self.eps = eps
 
+    def initialize(self):
+        self.Sb = {key: 0 for key in self.MLP.Weights.keys()}
+        self.Sw = {key: 0 for key in self.MLP.Weights.keys()}
+        self.Vb = {key: 0 for key in self.MLP.Weights.keys()}
+        self.Vw = {key: 0 for key in self.MLP.Weights.keys()}
 
     def batch_size(self, size=32):
         if size <= 0 or size > self.MLP.X_train.shape[0]:
@@ -97,12 +102,6 @@ class ADAM(Optimizer):
         Sb_corr = self.Sb[key] / (1 - self.beta_2 ** t)
         return Vb_corr * 1 / np.sqrt(Sb_corr + self.eps)
 
-
-    def initialize(self):
-        self.Sb = {key: 0 for key in self.MLP.Weights.keys()}
-        self.Sw = {key: 0 for key in self.MLP.Weights.keys()}
-        self.Vb = {key: 0 for key in self.MLP.Weights.keys()}
-        self.Vw = {key: 0 for key in self.MLP.Weights.keys()}
 
 
 class Minibatch(Optimizer):

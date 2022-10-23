@@ -44,10 +44,10 @@ class Tanh(ActivationFunction):
     """
 
     def value(self, z):
-        return  0.99*(1.01+ ((np.exp(z) - np.exp(-z)) / (np.exp(z) + np.exp(-z))))/2
+        return  ((np.exp(z) - np.exp(-z)) / (np.exp(z) + np.exp(-z)))/2
 
     def derivative(self, z):
-        return 0.99*(1 - self.value(z)**2)/2
+        return (1 - self.value(z)**2)/2
 
 
 class ReLu(ActivationFunction):

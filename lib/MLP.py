@@ -159,6 +159,14 @@ class MLP:
         :return:
         """
 
+        #Warning
+        if isinstance(self.func_activation[self.counter], ActivationFunction.Tanh):
+            print("WARNING ! TANH ACTIVATION ON OUTPUT LAYER")
+        if self.Weights[self.counter].shape[0]>1 and not(isinstance(self.func_activation[self.counter], ActivationFunction.Softmax)):
+            print("WARNING ! ATTEMPTED TO USE OTHER OUTPUT ACTIVATION THAN SOFTMAX WHILE OUTPUT SIZE > 1")
+            print("SOFTMAX TAKEN BY DEFAULT")
+            self.func_activation[self.counter] = ActivationFunction.Softmax()
+
         # Check the dimension of the label vector
         if len(y.shape) < 2:
             y = y[:, None]
@@ -286,7 +294,7 @@ class MLP:
         # Return the list of the batch instead of the array because there are not always the same number of samples
         return all_batches
 
-    def add_layer(self, nb_nodes, feat_size=0, activation='tanh'):
+    def add_layer(self, nb_nodes, feat_size=0, activation='sigmoid'):
         """
         Add a layer to the Multi-Layer Perceptron NN
         :param nb_nodes: number of neurons in the layers
@@ -296,9 +304,15 @@ class MLP:
         """
         # Update the number of layers
         self.counter += 1
+
+        #impossible case
+        if nb_nodes == 1 and activation == "softmax":
+            print("Warning ! Softmax is not to be used on 1 output layer. Sigmoid is taken by default")
+            activation = "sigmoid"
+
         # Set the activation function of the layer
         if activation not in ['tanh', 'sigmoid', 'relu', 'softmax']:
-            activation = 'tanh'
+            activation = 'sigmoid'
         if activation == 'tanh':
             self.func_activation[self.counter] = ActivationFunction.Tanh()
         elif activation == 'sigmoid':
@@ -424,7 +438,7 @@ class MLP:
                 simple_acc += accuracy((a >= 0.5).astype('int'), y)
                 simple_err += self.error.value(y, a)
             elif isinstance(self.func_activation[self.counter], ActivationFunction.Tanh):
-                simple_acc += accuracy((a >= 0.5).astype('int'), y)
+                simple_acc += accuracy((a >= 0).astype('int'), y)
                 simple_err += self.error.value(y, a)
             else:
                 # softmax
@@ -457,17 +471,20 @@ class MLP:
         Prediction in terms of class of the MLP Neural Network
         :param X: input of the MLP
         :return: predicted labels. Threshold of 0.5 for logistic/pseudo-tanh regression
+        Warning ! Tanh output activation is allowed but is not recommended
+        as the output will be between -1 and 1.
+        Moreover losses like cross entropy cannot compute tanh negetive values
         """
         y_proba = self.predict_proba(X)
         if isinstance(self.func_activation[self.counter], ActivationFunction.Sigmoid):
             return (y_proba >= 0.5).astype('int')
         elif isinstance(self.func_activation[self.counter], ActivationFunction.Tanh):
-            return (y_proba >= 0.5).astype('int')
+            return (y_proba >= 0).astype('int')
         else:
             # softmax
             return np.argmax(y_proba, 0)
 
-    def Kfold_simulation(self, X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=300, l=0.01):
+    def Kfold_simulation(self, X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=300, l=0.01, print_res = False):
         """
         Simulate the K fold cross validation on the data. At each step (0 to K-1),
         accuracy on current test set is displayed.
@@ -483,7 +500,7 @@ class MLP:
         acc = []
         for i in range(Kfold):
             self.reinitialize()
-            self.fit(Train_sets[i], Train_y[i], BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCHS, l=l, print_res=False)
+            self.fit(Train_sets[i], Train_y[i], BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCHS, l=l, print_res=print_res)
             y_pred = self.predict(Test_sets[i])
             acci = accuracy(y_pred, Test_y[i])
             acc.append(acci)
