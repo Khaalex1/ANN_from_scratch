@@ -134,9 +134,10 @@ def get_hyperparameters():
         nodes_n = ask_request('Number of neurons in layer {} :'.format(n), 'Please enter a positive number', type='int',
                               string_range=None)
         nodes.append(nodes_n)
+        activations_p = ['relu', 'tanh', 'sigmoid']
         activation_n = ask_request('Activation function in layer {} :'.format(n),
-                                   'Please enter a valid activation function (relu or tanh)', type='string',
-                                   string_range=['relu', 'tanh'])
+                                   'Please enter a valid activation function ({})'.format(activations_p), type='string',
+                                   string_range=activations_p)
         activations.append(activation_n)
     n_output = ask_request('Number of neurons in the output layer :', 'Please enter a positive number', type='int',
                            string_range=None)
@@ -157,7 +158,7 @@ def get_hyperparameters():
     print('---' * 10)
     print('Training hyperparameters ')
     if n_output >= 2:
-        loss_functions = ['cross_entropy', 'mse', 'abs']
+        loss_functions = ['cross_entropy']
     else:
         loss_functions = ['binary_cross_entropy', 'mse', 'abs']
     optimizers_p = ['sgd', 'batch', 'minibatch', 'adam', 'rmsprop']
