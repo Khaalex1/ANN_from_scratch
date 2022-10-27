@@ -5,16 +5,20 @@ import argparse
 import MinMax
 import MLP
 
-
-
-
 def main():
+    """
+    Main function to use the implementation of the MLP
+    :return:
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--default_hyperparameters", help="Use the default value for the hyperparameters", action="store_true")
+    parser.add_argument("-b", "--batch_normalization", help="Use batch-normalization after each layer (except the output layer)", action="store_true")
     parser.add_argument("-k", "--cross_validation", type=int, default=0, help="Use cross_validation with the number of fold specified by this option")
     parser.add_argument("-p", "--plot", help="Plot the training curve of the accuracy and loss of the model during training", action="store_true")
+
     args = parser.parse_args()
     if args.default_hyperparameters:
+        #Default hyperparameters
         print("Default hyperparameters will be used")
         nodes = [64, 32, 2]
         activations = ['relu', 'relu', 'softmax']
@@ -34,23 +38,29 @@ def main():
         print('Learning rate : {}'.format(l_rate))
         print('Batch-size : {}'.format(BATCH_SIZE))
         print('Epochs : {}'.format(EPOCHS))
-
     else:
+        #Ask the user to define the hyperparameters
         nodes, activations, loss, optimizer, l_rate, BATCH_SIZE, EPOCHS = get_hyperparameters()
+    #Load the dataset into features matrix for training and testing
     X_train, Y_train, X_test, Y_test, nb_feat = load_dataset()
+    #Build the Multilayer Perceptron with the defined hyperparameters
     model = MLP.MLP()
     for i in range(len(nodes)):
         if i == 0:
             model.add_layer(nb_nodes=nodes[i], feat_size=nb_feat, activation=activations[i])
         else:
             model.add_layer(nb_nodes=nodes[i], activation=activations[i])
+        if args.batch_normalization and (i != len(nodes)-1):
+            model.BatchNormalization()
     model.compile(optimizer=optimizer, loss=loss)
     model.fit(X_train, Y_train, BATCH_SIZE, EPOCHS, l=l_rate)
+    # Evaluation with the test dataset
     print("---"*10)
     print("Evaluation of the model on the test dataset :")
     y_pred = model.predict(X_test)
     acc_test = MLP.accuracy(y_pred, Y_test)
     print('Test accuracy : {}'.format(np.round(acc_test, 4)))
+    # Check the options of plot and cross-validation
     if args.plot:
         model.training_curve()
     if args.cross_validation:
@@ -59,7 +69,6 @@ def main():
         X = np.concatenate((X_train, X_test), axis=0)
         Y = np.concatenate((Y_train, Y_test), axis=0)
         acc, locc = model.Kfold_simulation(X, Y, args.cross_validation, BATCH_SIZE, EPOCHS, l_rate,)
-
 
 
 def load_dataset():
@@ -79,14 +88,13 @@ def load_dataset():
     data.pop(0)
     data['label'] = label_col
 
-    #print(np.where(data.isna() == True))
     print('---'*10)
     print('The MLP will use the following dataset of breast cancer data')
     print(data.head())
-    print('Number of features : {}'.format(data.shape[1]))
+    print('Number of features : {}'.format(data.shape[1] -1))
     print('Number of samples : {}'.format(data.shape[0]))
     print('---'*10)
-    nb_split = ask_request('Please enter the fraction of the data you want to keep for the training process (the other for test)', 'Please enter a fraction between 0 and 1', type='float', string_range=None)
+    nb_split = ask_request('Please enter the fraction of the data you want to keep for the training process (the other for test) :', 'Please enter a fraction between 0.0 (not included) and 1.0', type='float', string_range=None)
 
     #Shuffle the dataset and split into train and test dataset
     data = data.sample(frac=1)
@@ -202,7 +210,7 @@ def ask_request(message, error_message, type, string_range,  int_range=None):
         return value
     if type == 'float':
         value = float(input())
-        while value <=0.0:
+        while (value <= 0.0) and (value > 1.0):
             print(error_message)
             value = float(input())
         return value

@@ -517,6 +517,8 @@ class MLP:
         print("Average accuracy by X-validation = {} +-  {}".format(np.round(np.mean(acc), 4), np.round(np.std(acc), 4)))
         return acc, times
 
+
+# Functions to test the hyperparameters
 def hidden_layers_tunning(X, y, nb_hidden_layers, nodes_per_layers, BATCH_SIZE, EPOCH, optimizer='minibatch', l=0.01):
     history_kfold = {}
     times_kfold = {}
@@ -527,7 +529,6 @@ def hidden_layers_tunning(X, y, nb_hidden_layers, nodes_per_layers, BATCH_SIZE, 
                 model.add_layer(nodes_per_layers[i][n], feat_size=nb_feat, activation='relu')
             else:
                 model.add_layer(nodes_per_layers[i][n], activation='relu')
-            #model.BatchNormalization()
         model.add_layer(nb_nodes=2, activation='softmax')
         model.compile(optimizer=optimizer, loss="cross_entropy")
         Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCH, l=l)
@@ -536,17 +537,13 @@ def hidden_layers_tunning(X, y, nb_hidden_layers, nodes_per_layers, BATCH_SIZE, 
 
     tunning_plot(history_kfold, times_kfold, title='k-fold accuracy related to the number of hidden layers', xlabel='Number of hidden layers')
 
-def batch_size_tunning(X, y, BATCH_SIZES, EPOCH, optimizer='minibatch', l=0.1):
+def batch_size_tunning(X, y, BATCH_SIZES, EPOCH, optimizer='minibatch', l=0.01):
     history_kfold = {}
     times_kfold = {}
     for i in range(len(BATCH_SIZES)):
         model = MLP()
         model.add_layer(64, feat_size=nb_feat, activation='relu')
-        #model.BatchNormalization()
         model.add_layer(32, activation='relu')
-        #model.BatchNormalization()
-        #model.add_layer(16, activation='relu')
-        #model.BatchNormalization()
         model.add_layer(2, activation='softmax')
         model.compile(optimizer, loss='cross_entropy')
         Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZES[i], EPOCHS=EPOCH, l=l)
@@ -562,7 +559,6 @@ def optimizer_tunning(X,y, optimizers, BATCH_SIZE, EPOCH, l):
         model = MLP()
         model.add_layer(64, feat_size=nb_feat, activation='relu')
         model.add_layer(32, activation='relu')
-        #model.add_layer(16, activation='relu')
         model.add_layer(2, activation='softmax')
         model.compile(optimizer=optimizers[i], loss='cross_entropy')
         if optimizers[i] == 'sgd':
@@ -579,14 +575,13 @@ def optimizer_tunning(X,y, optimizers, BATCH_SIZE, EPOCH, l):
 
     tunning_plot(history_kfold, times_kfold, title='k-fold accuracy related to the optimizers', xlabel='Optimizer')
 
-def output_layer_tunning(X, y, output_act_functions, BATCH_SIZE, EPOCH, optimizer='minibatch', l=0.1):
+def output_layer_tunning(X, y, output_act_functions, BATCH_SIZE, EPOCH, optimizer='minibatch', l=0.01):
     history_kfold = {}
     times_kfold = {}
     for i in range(len(output_act_functions)):
         model = MLP()
         model.add_layer(64, feat_size=nb_feat, activation='relu')
         model.add_layer(32, activation='relu')
-        #model.add_layer(16, activation='relu')
         if output_act_functions[i] == 'softmax':
             nodes = 2
             loss = 'cross_entropy'
@@ -693,6 +688,7 @@ def tunning_plot(history_kfold, times_kfold, title, xlabel, figsize=(15,10), yla
     """
     Plot the tunning of one hyperparameter
     :param history_kfold: dictionary with the values of k-fold accuracy for each value of the hyperparameter
+    :param times_kfold : dictionnary with the averaged time spent to train the model during one fold of cross_validation
     :param title: title of the plot
     :param xlabel: xlabel of the plot
     :param figsize: figsize of the plot (default (10,10))
