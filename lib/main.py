@@ -9,7 +9,34 @@ import MLP
 
 
 def main():
-    nodes, activations, loss, optimizer, l_rate, BATCH_SIZE, EPOCHS = get_hyperparameters()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--default_hyperparameters", help="Use the default value for the hyperparameters", action="store_true")
+    parser.add_argument("-k", "--cross_validation", type=int, default=0, help="Use cross_validation with the number of fold specified by this option")
+    parser.add_argument("-p", "--plot", help="Plot the training curve of the accuracy and loss of the model during training", action="store_true")
+    args = parser.parse_args()
+    if args.default_hyperparameters:
+        print("Default hyperparameters will be used")
+        nodes = [64, 32, 2]
+        activations = ['relu', 'relu', 'softmax']
+        loss = 'cross_entropy'
+        optimizer = 'minibatch'
+        l_rate = 0.01
+        BATCH_SIZE = 8
+        EPOCHS = 125
+        print('---'*10)
+        print('Layers : \n')
+        print('   Neurons : {}'.format(nodes))
+        print('   Activations functions : {}'.format(activations))
+        print('---' * 10)
+        print('Training hyperparameters ')
+        print('Loss function : {}'.format(loss))
+        print('Optimizer : {}'.format(optimizer))
+        print('Learning rate : {}'.format(l_rate))
+        print('Batch-size : {}'.format(BATCH_SIZE))
+        print('Epochs : {}'.format(EPOCHS))
+
+    else:
+        nodes, activations, loss, optimizer, l_rate, BATCH_SIZE, EPOCHS = get_hyperparameters()
     X_train, Y_train, X_test, Y_test, nb_feat = load_dataset()
     model = MLP.MLP()
     for i in range(len(nodes)):
@@ -19,10 +46,27 @@ def main():
             model.add_layer(nb_nodes=nodes[i], activation=activations[i])
     model.compile(optimizer=optimizer, loss=loss)
     model.fit(X_train, Y_train, BATCH_SIZE, EPOCHS, l=l_rate)
-    model.training_curve()
+    print("---"*10)
+    print("Evaluation of the model on the test dataset :")
+    y_pred = model.predict(X_test)
+    acc_test = MLP.accuracy(y_pred, Y_test)
+    print('Test accuracy : {}'.format(np.round(acc_test, 4)))
+    if args.plot:
+        model.training_curve()
+    if args.cross_validation:
+        print('---'*10)
+        print('{}-fold cross_validation :'.format(args.cross_validation))
+        X = np.concatenate((X_train, X_test), axis=0)
+        Y = np.concatenate((Y_train, Y_test), axis=0)
+        acc, locc = model.Kfold_simulation(X, Y, args.cross_validation, BATCH_SIZE, EPOCHS, l_rate,)
+
 
 
 def load_dataset():
+    """
+    Load the breast cancer dataset and pre-process it with Min-Max Scale
+    :return:
+    """
     # Load the dataset
     data = pd.read_csv('../wdbc.csv')
     # Add columns
@@ -65,6 +109,10 @@ def load_dataset():
 
 
 def get_hyperparameters():
+    """
+    Ask the user to set the hyperparamameters of the Multilayer perceptron
+    :return:
+    """
     print('Enter the hyperparameters you want to use')
     print('---' * 10)
     print('Number of hidden layers :')
@@ -75,7 +123,7 @@ def get_hyperparameters():
     nodes = []
     activations = []
     for n in range(1, nb_layers + 1):
-        nodes_n = ask_request('Number of neurons in layer {}'.format(n), 'Please enter a positive number', type='int',
+        nodes_n = ask_request('Number of neurons in layer {} :'.format(n), 'Please enter a positive number', type='int',
                               string_range=None)
         nodes.append(nodes_n)
         activation_n = ask_request('Activation function in layer {} :'.format(n),
@@ -100,7 +148,10 @@ def get_hyperparameters():
     print('   Activations functions : {}'.format(activations))
     print('---' * 10)
     print('Training hyperparameters ')
-    loss_functions = ['cross_entropy', 'binary_cross_entropy', 'mse', 'abs']
+    if n_output >= 2:
+        loss_functions = ['cross_entropy', 'mse', 'abs']
+    else:
+        loss_functions = ['binary_cross_entropy', 'mse', 'abs']
     optimizers_p = ['sgd', 'batch', 'minibatch', 'adam', 'rmsprop']
     loss = ask_request('Loss function :', 'Please enter a valid loss function ({})'.format(loss_functions),
                        type='string', string_range=loss_functions)

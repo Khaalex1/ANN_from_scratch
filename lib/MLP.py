@@ -514,8 +514,7 @@ class MLP:
             acc.append(acci)
             print("Test set {}: Accuracy = {} ".format(i, acci))
 
-        avg_acc = np.mean(acc)
-        print("Average accuracy by X-validation = ", avg_acc)
+        print("Average accuracy by X-validation = {} +-  {}".format(np.round(np.mean(acc), 4), np.round(np.std(acc), 4)))
         return acc, times
 
 def hidden_layers_tunning(X, y, nb_hidden_layers, nodes_per_layers, BATCH_SIZE, EPOCH, optimizer='minibatch', l=0.01):
@@ -752,23 +751,6 @@ if __name__ == "__main__":
     MM = MinMax()
     X_train = MM.fit_transform(X_train)
     X_test = MM.transform(X_test)
-
-    # AN = MLP()
-    # AN.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
-    # AN.BatchNormalization()
-    # AN.add_layer(nb_nodes=32, activation='relu')
-    # AN.BatchNormalization()
-    # AN.add_layer(nb_nodes=16, activation='relu')
-    # AN.BatchNormalization()
-    # AN.add_layer(nb_nodes=2, activation='softmax')
-    # AN.compile(optimizer="minibatch", loss="cross_entropy")
-    # AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=150, l=0.01, val_split=0.33)
-    # AN.training_curve()
-
-    #y_pred = AN.predict(X_test)
-    #print("Accuracy on Test set :", accuracy(y_pred, Y_test))
-    # use the same conditions to compute the accuracy for the test as for the training and val data (check the instance and encode in one hot if needed)
-
 
     # -----------------------------------------
     # K-fold cross-validation
