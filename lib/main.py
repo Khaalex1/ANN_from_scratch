@@ -145,7 +145,7 @@ def get_hyperparameters():
     if n_output >= 2:
         possible_output_act = ['softmax']
     else:
-        possible_output_act = ['tanh', 'sigmoid']
+        possible_output_act = ['sigmoid']
     act_output = ask_request('Activation function in the output layer :',
                              'Please enter a valid activation function in ({})'.format(possible_output_act),
                              type='string', string_range=possible_output_act)
