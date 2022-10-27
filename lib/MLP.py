@@ -1,6 +1,7 @@
 import numpy as np  # linear algebra
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import datetime
+import time
 import matplotlib.pyplot as plt
 import ActivationFunction, Loss
 from MinMax import MinMax
@@ -146,7 +147,7 @@ class MLP:
 
 
 
-    def fit(self, X, y, BATCH_SIZE=1, EPOCHS=300, val_split=0.3, l=0.001, print_res = True):
+    def fit(self, X, y, BATCH_SIZE=1, EPOCHS=300, val_split=0.3, l=0.1, print_res = True):
         """
         Training of the MLP (fitting the weights with gradient descent)
         :param X: training data matrix(n_samples,n_features)
@@ -172,11 +173,14 @@ class MLP:
             y = y[:, None]
 
         # Split the dataset into training and validation dataset
-        data_shuffle = np.hstack((X, y))
-        np.random.shuffle(data_shuffle)
-        n_val = int(val_split * X.shape[0])
-        X_val, y_val = data_shuffle[0:n_val, 0:-1], data_shuffle[0:n_val, -1]
-        X_train, y_train = data_shuffle[n_val:-1, 0:-1], data_shuffle[n_val:-1, -1][:, None]
+        if val_split:
+            data_shuffle = np.hstack((X, y))
+            np.random.shuffle(data_shuffle)
+            n_val = int(val_split * X.shape[0])
+            X_val, y_val = data_shuffle[0:n_val, 0:-1], data_shuffle[0:n_val, -1]
+            X_train, y_train = data_shuffle[n_val:-1, 0:-1], data_shuffle[n_val:-1, -1][:, None]
+        else:
+            X_train, y_train = X, y
 
         # Check the input
         # verify samples (0) > features (1)
@@ -209,31 +213,31 @@ class MLP:
             # Gradient descent
             step_acc, step_err = self.gradient_descent(ep, gamma=l, batch_size=self.batch_size)
             # Evaluate the MLP on the validation data
-            y_proba_val = self.predict_proba(X_val)
-            y_pred_val = self.predict(X_val)
-            val_acc = accuracy(y_pred_val, y_val)
-            if isinstance(self.func_activation[self.counter], ActivationFunction.Softmax):
-                self.error.one_hot = True
-                val_err = self.error.value(one_hot(y_val), y_proba_val)
-            else :
-                val_err = self.error.value(y_val, y_proba_val)
-            self.history['val_acc'].append(val_acc)
-            self.history['val_loss'].append(val_err)
-
-
+            if val_split:
+                y_proba_val = self.predict_proba(X_val)
+                y_pred_val = self.predict(X_val)
+                val_acc = accuracy(y_pred_val, y_val)
+                if isinstance(self.func_activation[self.counter], ActivationFunction.Softmax):
+                    self.error.one_hot = True
+                    val_err = self.error.value(one_hot(y_val), y_proba_val)
+                else :
+                    val_err = self.error.value(y_val, y_proba_val)
+                self.history['val_acc'].append(val_acc)
+                self.history['val_loss'].append(val_err)
             if print_res:
                 # Print the training metrics
                 if ep == 1 or ep % 10 == 0:
-                    print("Epoch : {},  acc : {} - loss : {} - val accuracy : {} - val loss : {}".format(ep, step_acc,
-                                                                                                     step_err, val_acc,
-                                                                                                         val_err))
+                    if val_split:
+                        print("Epoch : {},  acc : {} - loss : {} - val accuracy : {} - val loss : {}".format(ep, step_acc,step_err, val_acc, val_err))
+                    else:
+                        print("Epoch : {},  acc : {} - loss : {} ".format(ep, step_acc,step_err))
         if print_res:
             tf = datetime.datetime.now() - t0
             print('Training time (hh:mm:ss): {}'.format(tf))
             print('---' * 10)
             print('Last epoch :')
             print("Epoch : {},  Batch accuracy : {} - Batch error = {}".format(ep, step_acc, step_err))
-
+        return self.history
 
 
     def reinitialize(self):
@@ -283,7 +287,7 @@ class MLP:
         nb_batches = self.nb_samp // batch_size
         # Concatenate the feature matrix with the label vector before shuffle
         data = np.hstack((self.X_train, self.y_train))
-        np.random.shuffle(data)  # suffle the data to improve the accuracy
+        np.random.shuffle(data)  # shuffle the data to improve the accuracy
         for i in range(nb_batches):
             if i == nb_batches - 1:
                 batch = data[i * batch_size:data.shape[0], :]
@@ -305,7 +309,7 @@ class MLP:
         # Update the number of layers
         self.counter += 1
 
-        #impossible case
+        # Impossible case
         if nb_nodes == 1 and activation == "softmax":
             print("Warning ! Softmax is not to be used on 1 output layer. Sigmoid is taken by default")
             activation = "sigmoid"
@@ -321,7 +325,7 @@ class MLP:
             self.func_activation[self.counter] = ActivationFunction.ReLu()
         else:
             self.func_activation[self.counter] = ActivationFunction.Softmax()
-        #Initialize the weights and bias
+        # Initialize the weights and bias
         if self.counter == 1:
             self.Weights[1] = np.random.rand(nb_nodes, feat_size) - 0.5
             self.Bias[1] = np.random.rand(nb_nodes, 1) - 0.5
@@ -445,8 +449,8 @@ class MLP:
                 self.error.one_hot = True
                 simple_acc += accuracy(np.argmax(a, 0), y)
                 simple_err += self.error.value(one_hot(y), a)
-        step_acc = simple_acc / (i + 1)  # i = len(all_batches) ?
-        step_err = simple_err / (i + 1)
+        step_acc = simple_acc / (len(all_batches) + 1)
+        step_err = simple_err / (len(all_batches) + 1)
         self.history['acc'].append(step_acc)
         self.history['loss'].append(step_err)
         return step_acc, step_err
@@ -484,7 +488,7 @@ class MLP:
             # softmax
             return np.argmax(y_proba, 0)
 
-    def Kfold_simulation(self, X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=300, l=0.01, print_res = False):
+    def Kfold_simulation(self, X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=300, l=0.1, print_res = False):
         """
         Simulate the K fold cross validation on the data. At each step (0 to K-1),
         accuracy on current test set is displayed.
@@ -498,9 +502,13 @@ class MLP:
         """
         Train_sets, Train_y, Test_sets, Test_y = K_fold_separation(X, y, K=Kfold)
         acc = []
+        times = []
         for i in range(Kfold):
             self.reinitialize()
-            self.fit(Train_sets[i], Train_y[i], BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCHS, l=l, print_res=print_res)
+            t0 = time.time()
+            self.fit(Train_sets[i], Train_y[i], BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCHS, l=l, print_res=print_res, val_split=0.0)
+            tf = time.time() - t0
+            times.append(tf)
             y_pred = self.predict(Test_sets[i])
             acci = accuracy(y_pred, Test_y[i])
             acc.append(acci)
@@ -508,7 +516,205 @@ class MLP:
 
         avg_acc = np.mean(acc)
         print("Average accuracy by X-validation = ", avg_acc)
-        return avg_acc
+        return acc, times
+
+def hidden_layers_tunning(X, y, nb_hidden_layers, nodes_per_layers, BATCH_SIZE, EPOCH, optimizer='minibatch', l=0.01):
+    history_kfold = {}
+    times_kfold = {}
+    for i in range(len(nb_hidden_layers)):
+        model = MLP()
+        for n in range(nb_hidden_layers[i]):
+            if n == 0:
+                model.add_layer(nodes_per_layers[i][n], feat_size=nb_feat, activation='relu')
+            else:
+                model.add_layer(nodes_per_layers[i][n], activation='relu')
+            #model.BatchNormalization()
+        model.add_layer(nb_nodes=2, activation='softmax')
+        model.compile(optimizer=optimizer, loss="cross_entropy")
+        Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCH, l=l)
+        history_kfold[nb_hidden_layers[i]] = Kfold_acc
+        times_kfold[nb_hidden_layers[i]] = np.mean(Kfold_time)
+
+    tunning_plot(history_kfold, times_kfold, title='k-fold accuracy related to the number of hidden layers', xlabel='Number of hidden layers')
+
+def batch_size_tunning(X, y, BATCH_SIZES, EPOCH, optimizer='minibatch', l=0.1):
+    history_kfold = {}
+    times_kfold = {}
+    for i in range(len(BATCH_SIZES)):
+        model = MLP()
+        model.add_layer(64, feat_size=nb_feat, activation='relu')
+        #model.BatchNormalization()
+        model.add_layer(32, activation='relu')
+        #model.BatchNormalization()
+        #model.add_layer(16, activation='relu')
+        #model.BatchNormalization()
+        model.add_layer(2, activation='softmax')
+        model.compile(optimizer, loss='cross_entropy')
+        Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZES[i], EPOCHS=EPOCH, l=l)
+        history_kfold[BATCH_SIZES[i]] = Kfold_acc
+        times_kfold[BATCH_SIZES[i]] = np.mean(Kfold_time)
+
+    tunning_plot(history_kfold, times_kfold, title='k-fold accuracy related to the batch size', xlabel='Batch-size')
+
+def optimizer_tunning(X,y, optimizers, BATCH_SIZE, EPOCH, l):
+    history_kfold = {}
+    times_kfold = {}
+    for i in range(len(optimizers)):
+        model = MLP()
+        model.add_layer(64, feat_size=nb_feat, activation='relu')
+        model.add_layer(32, activation='relu')
+        #model.add_layer(16, activation='relu')
+        model.add_layer(2, activation='softmax')
+        model.compile(optimizer=optimizers[i], loss='cross_entropy')
+        if optimizers[i] == 'sgd':
+            BATCH_SIZE_i = 1
+        elif optimizers[i] == 'batch':
+            BATCH_SIZE_i = X.shape[0]
+        elif (optimizers[i]=='adam') or (optimizers[i]=='rmsprop'):
+            BATCH_SIZE_i = BATCH_SIZE
+        else:
+            BATCH_SIZE_i = BATCH_SIZE
+        Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZE_i, EPOCHS=EPOCH, l=l)
+        history_kfold[optimizers[i]] = Kfold_acc
+        times_kfold[optimizers[i]] = np.mean(Kfold_time)
+
+    tunning_plot(history_kfold, times_kfold, title='k-fold accuracy related to the optimizers', xlabel='Optimizer')
+
+def output_layer_tunning(X, y, output_act_functions, BATCH_SIZE, EPOCH, optimizer='minibatch', l=0.1):
+    history_kfold = {}
+    times_kfold = {}
+    for i in range(len(output_act_functions)):
+        model = MLP()
+        model.add_layer(64, feat_size=nb_feat, activation='relu')
+        model.add_layer(32, activation='relu')
+        #model.add_layer(16, activation='relu')
+        if output_act_functions[i] == 'softmax':
+            nodes = 2
+            loss = 'cross_entropy'
+        else:
+            nodes = 1
+            loss = 'binary_cross_entropy'
+        model.add_layer(nodes, activation=output_act_functions[i])
+        model.compile(optimizer=optimizer, loss=loss)
+        Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCH, l=l)
+        history_kfold[output_act_functions[i]] = Kfold_acc
+        times_kfold[output_act_functions[i]] = np.mean(Kfold_time)
+
+    tunning_plot(history_kfold, times_kfold,title='k-fold accuracy related to the output layer activation', xlabel='Output layer activation')
+
+def epochs_tunning(X, y, EPOCHS, BATCH_SIZE, optimizer='minibatch', l=0.01):
+    history_kfold = {}
+    times_kfold = {}
+    for i in range(len(EPOCHS)):
+        model = MLP()
+        model.add_layer(64, feat_size=nb_feat, activation='relu')
+        model.add_layer(32, activation='relu')
+        model.add_layer(2, activation='softmax')
+        model.compile(optimizer=optimizer, loss='cross_entropy')
+        Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCHS[i], l=l)
+        history_kfold[EPOCHS[i]] = Kfold_acc
+        times_kfold[EPOCHS[i]] = np.mean(Kfold_time)
+
+    tunning_plot(history_kfold, times_kfold, title='k-fold accuracy related to the number of epochs', xlabel='Number of epochs')
+
+
+def l_rate_tunning(X, y, l_rates, EPOCH, BATCH_SIZE, optimizer='minibatch'):
+    history_kfold = {}
+    times_kfold = {}
+    for i in range(len(l_rates)):
+        model = MLP()
+        model.add_layer(64, feat_size=nb_feat, activation='relu')
+        model.add_layer(32, activation='relu')
+        model.add_layer(2, activation='softmax')
+        model.compile(optimizer=optimizer, loss='cross_entropy')
+        Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCH, l=l_rates[i])
+        history_kfold[l_rates[i]] = Kfold_acc
+        times_kfold[l_rates[i]] = np.mean(Kfold_time)
+    tunning_plot(history_kfold, times_kfold, title='k-fold accuracy related to the learning rate', xlabel='Learning rate')
+
+def act_function_tunning(X, y, act_functions, EPOCH, BATCH_SIZE, optimizer='minibatch', l=0.1):
+    history_kfold = {}
+    times_kfold = {}
+    for i in range(len(act_functions)):
+        model = MLP()
+        model.add_layer(64, feat_size=nb_feat, activation=act_functions[i])
+        model.add_layer(32, activation=act_functions[i])
+        model.add_layer(2, activation='softmax')
+        model.compile(optimizer=optimizer, loss='cross_entropy')
+        Kfold_acc, Kfold_time = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=BATCH_SIZE, EPOCHS=EPOCH, l=l)
+        history_kfold[act_functions[i]] = Kfold_acc
+        times_kfold[act_functions[i]] = np.mean(Kfold_time)
+
+    tunning_plot(history_kfold, times_kfold , title='k-fold accuracy related to the activation function', xlabel='Activation function of the hidden layers')
+
+def batch_norm_effect(X, y, act_function, EPOCH, BATCH_SIZE, optimizer='minibatch', l=0.1 ):
+    model_0 = MLP()
+    model_0.add_layer(64, feat_size=nb_feat, activation=act_function)
+    model_0.add_layer(32, activation=act_function)
+    model_0.add_layer(2, activation='softmax')
+    model_0.compile(optimizer=optimizer, loss='cross_entropy')
+    history_0 = model_0.fit(X, y, BATCH_SIZE, EPOCH, l=l)
+    model_1 = MLP()
+    model_1.add_layer(64, feat_size=nb_feat, activation=act_function)
+    model_1.BatchNormalization()
+    model_1.add_layer(32, activation=act_function)
+    model_1.BatchNormalization()
+    model_1.add_layer(2, activation='softmax')
+    model_1.compile(optimizer=optimizer, loss='cross_entropy')
+    history_1 = model_1.fit(X, y, BATCH_SIZE, EPOCH, l=l)
+
+    figure, ax = plt.subplots(1, 2, figsize=(10, 5))
+    ax[0].set_title('Accuracy in function of epoch \n loss = {},\n optimizer = {},\n batch size = {}'.format('cross-entropy',
+                                                                                                             optimizer,
+                                                                                                             BATCH_SIZE))
+    ax[0].plot(history_0['acc'], color='blue', label='train data')
+    ax[0].plot(history_0['val_acc'], color='orange', label='val data')
+    ax[0].plot(history_1['acc'], color='black',  label='train data (BatchNorm)')
+    ax[0].plot(history_1['val_acc'], color='red', label='val data (BatchNorm)')
+    ax[0].grid()
+    ax[0].legend()
+    ax[0].set_xlabel('epochs')
+    ax[0].set_ylabel('accuracy')
+    ax[1].grid()
+    ax[1].plot(history_0['loss'], color='blue', label='train data')
+    ax[1].plot(history_0['val_loss'], color='orange', label='val data')
+    ax[1].plot(history_1['loss'], color='black', label='train data (BatchNorm)')
+    ax[1].plot(history_1['val_loss'], color='red', label='val data (BatchNorm)')
+    ax[1].set_xlabel('epochs')
+    ax[1].set_ylabel('error')
+    ax[1].set_title(
+        'Error in function of epoch \n loss = {},\n optimizer = {},\n batch size = {}'.format('cross_entropy', optimizer,
+                                                                                              BATCH_SIZE))
+    ax[1].legend()
+    figure.tight_layout(pad=3.0)
+
+    plt.show()
+
+def tunning_plot(history_kfold, times_kfold, title, xlabel, figsize=(15,10), ylabel='Accuracy'):
+    """
+    Plot the tunning of one hyperparameter
+    :param history_kfold: dictionary with the values of k-fold accuracy for each value of the hyperparameter
+    :param title: title of the plot
+    :param xlabel: xlabel of the plot
+    :param figsize: figsize of the plot (default (10,10))
+    :param ylabel: ylabel of the plot (default 'Accuracy')
+    :return: plot
+    """
+    plt.figure(figsize=figsize)
+    plt.subplot(1,2,1)
+    plt.boxplot([history_kfold[key] for key in history_kfold.keys()], showfliers=False)
+    plt.title(title)
+    plt.xticks(np.arange(1, len(history_kfold.keys()) + 1), [key for key in history_kfold.keys()])
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.subplot(1,2,2)
+    plt.bar(np.arange(1, len(history_kfold.keys()) + 1), times_kfold.values(), tick_label=[key for key in times_kfold.keys()], width=0.4, edgecolor='black')
+    plt.xticks(np.arange(1, len(history_kfold.keys()) + 1), [key for key in history_kfold.keys()])
+    plt.title('k-fold time per hyperparameter value')
+    plt.xlabel(xlabel)
+    plt.ylabel('Time [s]')
+
+
 
 if __name__ == "__main__":
     #  ------------------------------------------------------
@@ -521,6 +727,7 @@ if __name__ == "__main__":
     label_col = data[1].replace(d)
 
     data.pop(1)
+    data.pop(0)
     data['label'] = label_col
 
     print(data.shape)
@@ -546,46 +753,63 @@ if __name__ == "__main__":
     X_train = MM.fit_transform(X_train)
     X_test = MM.transform(X_test)
 
-    AN = MLP()
-    AN.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=32, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=2, activation='softmax')
-    AN.compile(optimizer="adam", loss = "cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=100, l=0.001)
-    AN.training_curve()
+    # AN = MLP()
+    # AN.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
+    # AN.BatchNormalization()
+    # AN.add_layer(nb_nodes=32, activation='relu')
+    # AN.BatchNormalization()
+    # AN.add_layer(nb_nodes=16, activation='relu')
+    # AN.BatchNormalization()
+    # AN.add_layer(nb_nodes=2, activation='softmax')
+    # AN.compile(optimizer="minibatch", loss="cross_entropy")
+    # AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=150, l=0.01, val_split=0.33)
+    # AN.training_curve()
 
-    """AN = MLP()
-    AN.add_layer(nb_nodes=100, feat_size=nb_feat, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=100, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=100, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=100, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=100, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=50, activation='relu')
-    AN.BatchNormalization()
-    AN.add_layer(nb_nodes=2, activation='softmax')
-    AN.compile(optimizer="rmsprop", loss="cross_entropy")
-    AN.fit(X_train, Y_train, BATCH_SIZE=32, EPOCHS=100, l=0.01)
-    AN.training_curve()"""
-
-
-    y_pred = AN.predict(X_test)
-    print("Accuracy on Test set :", accuracy(y_pred, Y_test))
+    #y_pred = AN.predict(X_test)
+    #print("Accuracy on Test set :", accuracy(y_pred, Y_test))
     # use the same conditions to compute the accuracy for the test as for the training and val data (check the instance and encode in one hot if needed)
 
 
     # -----------------------------------------
     # K-fold cross-validation
     # -----------------------------------------
+    # Hyperparameters tunning
+    EPOCHS = [50, 100, 150, 200, 250, 300, 400, 500, 1000, 3000]
+    nb_hidden_layers = [1, 2, 3, 4, 5]
+    nodes_per_layers = [[64], [64, 32], [64, 32, 16], [128, 64, 32, 16], [128, 64, 32, 16, 8]]
+    BATCH_SIZES = [1, 8, 16, 32, 64, 128, 256]
+    l_rates = [0.1, 0.01, 0.001, 0.0001]
+    optimizers = ["sgd", "batch", "minibatch", "rmsprop", "adam"]
+    output_act_functions = ['tanh', 'sigmoid', 'softmax']
+    loss_functions = ['binary_cross_entropy', 'mse', 'abs']
+    hidden_layers_act = ['relu', 'tanh']
+
     print('---'*10)
     print("K-fold Cross-Validation")
     M = MinMax()
     X = M.fit_transform(data[:,:-1])
     y = data[:,-1]
-    AN.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=32, EPOCHS=100)
+
+    #Values of default hyperparameters during tuning
+    EPOCH_TEST = 125
+    l_rate_TEST = 0.01
+    optimizer_TEST = 'minibatch'
+    BATCH_SIZE_TEST = 8
+
+    #hidden_layers_tunning(X, y, nb_hidden_layers, nodes_per_layers, BATCH_SIZE=BATCH_SIZE_TEST, EPOCH=EPOCH_TEST, optimizer=optimizer_TEST)
+    #batch_size_tunning(X, y, BATCH_SIZES, EPOCH=EPOCH_TEST, l=l_rate_TEST, optimizer=optimizer_TEST)
+    #optimizer_tunning(X, y, optimizers, BATCH_SIZE=BATCH_SIZE_TEST, EPOCH=EPOCH_TEST, l=l_rate_TEST)
+    #batch_norm_effect(X, y, 'relu', EPOCH_TEST, BATCH_SIZE_TEST, optimizer=optimizer_TEST, l=l_rate_TEST)
+    #output_layer_tunning(X, y, output_act_functions, BATCH_SIZE=BATCH_SIZE_TEST, EPOCH=EPOCH_TEST, l=l_rate_TEST, optimizer=optimizer_TEST)
+    #epochs_tunning(X, y, EPOCHS, BATCH_SIZE=8)
+    #l_rate_tunning(X, y, l_rates, EPOCH=EPOCH_TEST, BATCH_SIZE=BATCH_SIZE_TEST, optimizer=optimizer_TEST)
+    #act_function_tunning(X, y, hidden_layers_act, EPOCH=EPOCH_TEST, BATCH_SIZE=BATCH_SIZE_TEST, optimizer=optimizer_TEST, l=l_rate_TEST)
+    model = MLP()
+    model.add_layer(nb_nodes=64, feat_size=nb_feat, activation='relu')
+    model.add_layer(nb_nodes=32, activation='relu')
+    model.add_layer(nb_nodes=2, activation='softmax')
+    model.compile(optimizer_TEST, loss='cross_entropy')
+    #history = model.fit(X_train, Y_train, BATCH_SIZE_TEST, EPOCH_TEST, l=l_rate_TEST)
+    #model.training_curve()
+    acc, loss = model.Kfold_simulation(X, y, Kfold=10, BATCH_SIZE=8, EPOCHS=125, l=0.01)
+    print('10-fold accuracy : {} +-{}'.format(np.round(np.mean(acc), 4), np.round(np.std(acc), 4)))
