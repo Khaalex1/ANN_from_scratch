@@ -2,25 +2,57 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 class Optimizer(ABC):
-
+    """
+        Abstract class for the optimizers
+        """
     @abstractmethod
     def batch_size(self, size=32):
+        """
+        Fix the MLP's batch size
+        :param size: batch size
+        :return:
+        """
         pass
 
     @abstractmethod
     def update(self, key, dW, dB):
+        """
+        Updates optimizer's own parameter
+        :param key: dictionary key (can be list index as well) corresponding to the current layer
+        :param dW: Loss derivative in respect to W. Dictionary (or list) of the dW values for each layer
+        :param dB: Loss derivative in respect to B. Dictionary (or list) of the dB values for each layer
+        :return:
+        """
         pass
 
     @abstractmethod
-    def weight_factor(self, key, dW, epoch):
+    def weight_factor(self, key, dW, t):
+        """
+        Weight factor in the gradient descent : W := W - gamma* WEIGHT_FACTOR
+        :param key: dictionary key (can be list index as well) corresponding to the current layer
+        :param dW: Loss derivative in respect to W. Dictionary (or list) of the dW values for each layer
+        :param t: Current gradient descent iteration
+        :return: 2D array corresponding to the weight factor for layer 'key'
+        """
         pass
 
     @abstractmethod
-    def bias_factor(self, key, dB, epoch):
+    def bias_factor(self, key, dB, t):
+        """
+        Bias factor in the gradient descent : B := B - gamma* BIAS_FACTOR
+        :param key: dictionary key (can be list index as well) corresponding to the current layer
+        :param dB: Loss derivative in respect to B. Dictionary (or list) of the dB values for each layer
+        :param t: Current gradient descent iteration
+        :return: 2D array corresponding to the bias factor for layer 'key'
+        """
         pass
 
     @abstractmethod
     def initialize(self):
+        """
+        Initialize optimizer's parmeters
+        :return:
+        """
         pass
 
 class RMSPROP(Optimizer):
@@ -30,6 +62,7 @@ class RMSPROP(Optimizer):
 
     def __init__(self, MLP, beta_2 = 0.9, eps = 1e-8):
         self.MLP = MLP
+        # 2nd order moments
         self.Sb = {}
         self.Sw = {}
         self.beta_2 = beta_2
@@ -65,8 +98,10 @@ class ADAM(Optimizer):
 
     def __init__(self , MLP, beta_1 = 0.9, beta_2 = 0.9, eps = 1e-8):
         self.MLP = MLP
+        #2nd moment order
         self.Sb = {}
         self.Sw = {}
+        # 1st moment order
         self.Vb = {}
         self.Vw = {}
         self.beta_1 = beta_1
@@ -106,7 +141,7 @@ class ADAM(Optimizer):
 
 class Minibatch(Optimizer):
     """
-    Classic gradient descent
+    Classic Mnibatch gradient descent. Update of weights is realized after gradient desent is performed on a minibatch
     """
 
     def __init__(self, MLP):
@@ -132,7 +167,7 @@ class Minibatch(Optimizer):
 
 class SGD(Minibatch):
     """
-    SGD
+    Stochastic Gradient Descent. One sample is taken at a time (for weights update) in the gradient descent
     """
     def __init__(self , MLP):
         super().__init__(MLP)
@@ -143,7 +178,7 @@ class SGD(Minibatch):
 
 class Batch(Minibatch):
     """
-    Classic gradient descent
+    Batch Gradient Descent. All the batch is taken for the weights update in the gradient descent
     """
 
     def __init__(self, MLP):
