@@ -1,9 +1,9 @@
 import numpy as np
 
 class MinMax:
-        """
-        Minmax rescaling class
-        """
+    """
+    MinMax rescaling class
+    """
     def __init__(self, new_max = 1, new_min =0):
         self.old_min = None
         self.old_max = None
