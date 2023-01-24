@@ -1,6 +1,6 @@
 # ANN from scratch by A. Kha & R. Valeri
 
-Artificial Neural Network (Multi Layers Perceptron) from scratch designed during the Biologically Inspired Computation (BIC) course, delivered by Dr W. Pang at Heriot-Watt University. Samson Zhang's instructive youtube video [Building a neural network FROM SCRATCH (no Tensorflow/Pytorch, just numpy & math)](https://www.youtube.com/watch?v=w8yWXqWQYmU) helped to understand the implementation of the gradient descent.
+Artificial Neural Network (Multi Layers Perceptron) from scratch designed during the Biologically Inspired Computation (BIC) course at Heriot-Watt University. Samson Zhang's instructive youtube video [Building a neural network FROM SCRATCH (no Tensorflow/Pytorch, just numpy & math)](https://www.youtube.com/watch?v=w8yWXqWQYmU) helped to understand the implementation of the gradient descent.
 
 ## 1. Contents
 
